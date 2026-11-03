@@ -1505,10 +1505,6 @@ async function pullLatestBoot() {
   }
 }
 
-// 启动
-refreshTokenIndicator();
-boot();
-
 /* ===================== 远程同步（仓库 data.json） ===================== */
 const REMOTE = {
   owner: 'huangmai313',
@@ -1518,6 +1514,10 @@ const REMOTE = {
   lastSha: null
 };
 const PUSH_TOKEN_KEY = 'audit_push_token_v1';
+
+// 启动
+refreshTokenIndicator();
+boot();
 
 function setRemoteStatus(text, dotCls) {
   const dot = document.getElementById('remoteDot');
