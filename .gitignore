@@ -1,3 +1,7 @@
+# 审计工具（不发布）
+审计工具.html
+_tool_template.html
+
 # Python
 __pycache__/
 *.pyc
@@ -7,14 +11,12 @@ __pycache__/
 .trae-html-share-packages/
 .trae*
 
-# Bin / office docs (not part of web page)
+# Office docs / data
 *.docx
 日报/
 
-# OS
+# OS / IDE
 .DS_Store
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
