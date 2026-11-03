@@ -1530,26 +1530,74 @@ async function pushNow() {
 }
 
 function openSyncSettings() {
-  const existing = localStorage.getItem(PUSH_TOKEN_KEY);
-  const v = prompt(
-    '🔑 管理员推送设置\n\n' +
-    'GitHub Personal Access Token（需要 Contents 写权限）\n' +
-    '留空或点取消则仅能拉取，不能推送。\n\n' +
-    '创建: https://github.com/settings/tokens → Fine-grained → All repositories → Contents: Read and write\n\n' +
-    (existing ? '当前已设置，输入新值覆盖，输入 CLEAR 清除：' : '粘贴你的 token 后点确定：')
-  );
-  if (v === null) return;
-  v = v.trim();
-  if (!v) {
-    // 不做改变
-  } else if (v.toUpperCase() === 'CLEAR') {
-    localStorage.removeItem(PUSH_TOKEN_KEY);
-    toast('已清除 token');
-  } else {
-    localStorage.setItem(PUSH_TOKEN_KEY, v);
-    toast('✅ 已保存 token，现在可以推送了');
+  const existing = localStorage.getItem(PUSH_TOKEN_KEY) || '';
+  // 注入模态框（如果还没加）
+  let box = document.getElementById('tokenModal');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'tokenModal';
+    box.className = 'modal-overlay';
+    box.innerHTML = `
+      <div class="modal" style="min-width:380px">
+        <h3>🔑 管理员推送设置</h3>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0 12px">
+          输入 GitHub Personal Access Token（需要 <b>Contents: Read and write</b>）<br>
+          <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--accent)">创建 token</a> → Fine-grained → All repositories<br>
+          推送到仓库: <code>huangmai313/audit-it-memo</code>
+        </div>
+        <textarea id="tokenInput" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit"></textarea>
+        <div id="tokenTestResult" style="font-size:12px;margin-top:6px"></div>
+        <div class="modal-actions" style="margin-top:14px">
+          <button class="btn" onclick="testToken()">🧪 测试 token</button>
+          <button class="btn" onclick="clearToken()">🗑️ 清除已保存</button>
+          <button class="btn" onclick="document.getElementById('tokenModal').classList.remove('show')">取消</button>
+          <button class="btn primary" onclick="saveToken()">✅ 保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(box);
   }
+  document.getElementById('tokenInput').value = existing;
+  document.getElementById('tokenTestResult').textContent = existing ? '已有 token 填在上面，可以直接改或保留。' : '粘贴你的 token，然后点 ✅ 保存';
+  box.classList.add('show');
+}
+
+function clearToken() {
+  localStorage.removeItem(PUSH_TOKEN_KEY);
   refreshTokenIndicator();
+  toast('已清除 token');
+  document.getElementById('tokenInput').value = '';
+  document.getElementById('tokenTestResult').textContent = '已清除';
+}
+
+function saveToken() {
+  const v = document.getElementById('tokenInput').value.trim();
+  if (!v) {
+    alert('token 不能为空');
+    return;
+  }
+  localStorage.setItem(PUSH_TOKEN_KEY, v);
+  refreshTokenIndicator();
+  toast('✅ 已保存 token');
+  document.getElementById('tokenModal').classList.remove('show');
+}
+
+async function testToken() {
+  const v = document.getElementById('tokenInput').value.trim();
+  if (!v) {
+    document.getElementById('tokenTestResult').innerHTML = '<span style="color:#ef4444">❌ token 为空</span>';
+    return;
+  }
+  const res = await fetch('https://api.github.com/repos/huangmai313/audit-it-memo/contents/data.json', {
+    headers: { 'Authorization': 'Bearer ' + v, 'Accept': 'application/vnd.github+json' }
+  });
+  if (res.ok) {
+    const data = await res.json();
+    document.getElementById('tokenTestResult').innerHTML = `<span style="color:#16a34a">✅ token 有效！文件存在，大小 ${(data.content || '').length} 字节</span>`;
+  } else {
+    const d = await res.json().catch(() => ({}));
+    document.getElementById('tokenTestResult').innerHTML = `<span style="color:#ef4444">❌ HTTP ${res.status}：${(d.message || '可能是 Fine-grained 没开 Contents 写权限').slice(0, 60)}</span>`;
+  }
 }
 
 // 启动时尝试自动拉取
