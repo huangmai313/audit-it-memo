@@ -808,6 +808,17 @@ function drawConnections(rootNode) {
 /* ===================== 交互：选择节点 ===================== */
 function selectNode(nodeId) {
   selectedNodeId = nodeId;
+  // 点击节点时，自动展开该节点下所有有明细的字段
+  expandedFields.clear();
+  const page = getCurrentPage();
+  const node = findNode(page.root, nodeId);
+  if (node && node.form) {
+    node.form.forEach(f => {
+      if (f.type === 'subform' || ['select','checkbox','radio'].includes(f.type)) {
+        expandedFields.add(f.id);
+      }
+    });
+  }
   renderTree();
   renderFormPanel();
 }
