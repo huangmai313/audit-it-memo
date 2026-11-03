@@ -310,30 +310,31 @@ body.panel-collapsed .panel-toggle{right:0}
 .field-item .field-actions button:hover{color:var(--navy);background:#eef2f7}
 .field-item .field-actions button.del:hover{color:#fff;background:#ef4444}
 .field-item .field-actions .detail-btn{
-  font-size:11px;padding:2px 8px;border:1px solid var(--accent);border-radius:12px;
+  font-size:11px;padding:3px 10px;border:1px solid var(--accent);border-radius:12px;
   background:#fff;color:var(--accent);font-family:inherit;font-weight:500;
+  white-space:nowrap;flex-shrink:0;min-width:64px;text-align:center;
 }
 .field-item .field-actions .detail-btn:hover{background:var(--accent);color:#fff}
 .field-item .field-detail{
   flex:1 0 100%;margin-top:10px;padding:12px 14px;
   border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;
   font-size:12px;color:#475569;
-  display:none;
+  display:none;overflow:hidden;box-sizing:border-box;
 }
 .field-item.has-detail.expanded .field-detail{display:block}
 .field-item .field-detail .fd-row{display:flex;gap:8px;margin-bottom:6px;align-items:center}
 .field-item .field-detail .fd-row:last-child{margin-bottom:0}
 .field-item .field-detail .fd-label{color:#64748b;min-width:60px;flex-shrink:0;font-size:11px;font-weight:600}
-.field-item .field-detail .fd-value{flex:1}
-.field-item .field-detail .fd-chips{display:flex;flex-wrap:wrap;gap:5px}
+.field-item .field-detail .fd-value{flex:1;min-width:0}
+.field-item .field-detail .fd-chips{display:flex;flex-wrap:wrap;gap:5px;overflow:hidden}
 .field-item .field-detail .fd-chip{
   font-size:11px;padding:3px 9px;background:#dbeafe;border-radius:10px;color:#1e40af;
-  font-weight:500;
+  font-weight:500;white-space:nowrap;
 }
-.field-item .field-detail .fd-cols{display:flex;flex-direction:column;gap:5px}
+.field-item .field-detail .fd-cols{display:flex;flex-direction:column;gap:5px;overflow:hidden}
 .field-item .field-detail .fd-col{
   display:flex;gap:6px;padding:5px 8px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;
-  align-items:center;font-size:11.5px;
+  align-items:center;font-size:11.5px;flex-wrap:wrap;overflow:hidden;
 }
 .field-item .field-detail .fd-col .col-n{font-weight:600;color:var(--navy);min-width:56px}
 .field-item .field-detail .fd-col .col-t{color:var(--muted);background:#eef1f5;padding:1px 6px;border-radius:2px;font-size:10px}
