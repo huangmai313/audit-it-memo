@@ -1426,14 +1426,57 @@ function normalizePages(pages) {
 }
 
 /* ===================== 启动 ===================== */
+// 先从 localStorage 读作为 fallback，不要立刻渲染（等 pullLatest 结果）
 load();
-if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
-normalizePages(state.pages);
-save();
-renderPageList();
-renderTree();
-renderFormPanel();
-applyPanelCollapsed();
+const localBackup = JSON.parse(JSON.stringify(state));
+
+async function boot() {
+  // 尝试从远程拉最新版
+  const remoteOk = await pullLatestBoot();
+  if (!remoteOk) {
+    // 远程拉失败，用 localStorage 的备份
+    state = localBackup;
+    if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
+    normalizePages(state.pages);
+    save();
+    setRemoteStatus('远程不可用，使用本地数据', 'err');
+  }
+  renderPageList();
+  renderTree();
+  renderFormPanel();
+  applyPanelCollapsed();
+}
+
+// 启动用的 pullLatest，只返回成功/失败（不弹 toast，不覆盖 state 之外的东西）
+async function pullLatestBoot() {
+  setRemoteStatus('加载中…', 'sync');
+  const url = `https://raw.githubusercontent.com/${REMOTE.owner}/${REMOTE.repo}/${REMOTE.branch}/${REMOTE.file}?t=${Date.now()}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const remote = await res.json();
+    if (!remote || !remote.pages) throw new Error('远程数据格式无效');
+    state = remote;
+    if (typeof state.zoom === 'undefined') state.zoom = 1;
+    if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
+    if (!state.currentPageId || !state.pages.find(p => p.id === state.currentPageId)) {
+      state.currentPageId = state.pages[0].id;
+    }
+    normalizePages(state.pages);
+    state.viewRootId = null;
+    selectedNodeId = null;
+    state._dirty = false;
+    save();
+    setRemoteStatus('已同步 ' + (remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : '最新版'), 'ok');
+    return true;
+  } catch(err) {
+    return false;
+  }
+}
+
+// 启动
+refreshTokenIndicator();
+boot();
 
 /* ===================== 远程同步（仓库 data.json） ===================== */
 const REMOTE = {
@@ -1622,14 +1665,10 @@ async function testToken() {
   }
 }
 
-// 启动时尝试自动拉取
-refreshTokenIndicator();
-pullLatest();
-// 每 3 分钟静默检查一次更新
+// 启动用的自动拉取已经在 boot() 里完成了，这里只留轮询
 setInterval(() => {
   if (!document.hidden) pullLatest();
 }, 3 * 60 * 1000);
-// 用户切回此标签页时自动拉取
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) pullLatest();
 });
