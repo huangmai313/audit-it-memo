@@ -375,6 +375,17 @@ body.panel-collapsed .panel-toggle{right:0}
   content:"…";position:absolute;right:8px;top:50%;transform:translateY(-50%);
   font-size:16px;color:var(--muted);
 }
+
+/* ===== 远程同步区 ===== */
+.remote-sync{margin-top:14px;padding:10px;background:#f6f8fb;border-radius:8px;border:1px solid #e4e8f0}
+.remote-status-bar{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.remote-status-bar .dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex-shrink:0}
+.remote-status-bar .dot.ok{background:#22c55e}
+.remote-status-bar .dot.err{background:#ef4444}
+.remote-status-bar .dot.sync{background:#f59e0b;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.remote-actions{display:flex;gap:4px}
+.remote-actions .btn.sm{flex:1;font-size:11px;padding:5px 2px;margin:0}
 </style>
 </head>
 <body>
@@ -392,6 +403,17 @@ body.panel-collapsed .panel-toggle{right:0}
       <button class="btn" id="btnImport">📥 导入数据</button>
       <button class="btn" id="btnExport">📤 导出数据</button>
       <input type="file" id="fileImport" accept=".json">
+      <div class="remote-sync">
+        <div class="remote-status-bar" id="remoteStatusBar">
+          <span id="remoteDot" class="dot"></span>
+          <span id="remoteText">正在同步…</span>
+        </div>
+        <div class="remote-actions">
+          <button class="btn sm" onclick="pullLatest()" title="从仓库拉取最新版">⬇️ 拉取</button>
+          <button class="btn sm" onclick="pushNow()" title="推送当前数据到仓库（需管理员 token）">⬆️ 推送</button>
+          <button class="btn sm" onclick="openSyncSettings()" title="设置推送用的 GitHub token">⚙️</button>
+        </div>
+      </div>
     </div>
   </aside>
 
@@ -1406,6 +1428,113 @@ renderPageList();
 renderTree();
 renderFormPanel();
 applyPanelCollapsed();
+
+/* ===================== 远程同步（仓库 data.json） ===================== */
+const REMOTE = {
+  owner: 'huangmai313',
+  repo: 'audit-it-memo',
+  file: 'data.json',
+  branch: 'main',
+  lastSha: null
+};
+const PUSH_TOKEN_KEY = 'audit_push_token_v1';
+
+function setRemoteStatus(text, dotCls) {
+  const dot = document.getElementById('remoteDot');
+  const txt = document.getElementById('remoteText');
+  if (dot) { dot.className = 'dot'; if (dotCls) dot.classList.add(dotCls); }
+  if (txt) txt.textContent = text;
+}
+
+async function pullLatest() {
+  setRemoteStatus('拉取中…', 'sync');
+  const url = `https://raw.githubusercontent.com/${REMOTE.owner}/${REMOTE.repo}/${REMOTE.branch}/${REMOTE.file}?t=${Date.now()}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const remote = await res.json();
+    if (!remote || !remote.pages) throw new Error('远程数据格式无效');
+    state = remote;
+    if (typeof state.zoom === 'undefined') state.zoom = 1;
+    if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
+    if (!state.currentPageId || !state.pages.find(p => p.id === state.currentPageId)) {
+      state.currentPageId = state.pages[0].id;
+    }
+    normalizePages(state.pages);
+    state.viewRootId = null;
+    selectedNodeId = null;
+    save();
+    renderPageList();
+    renderTree();
+    renderFormPanel();
+    setRemoteStatus('已同步 ' + (remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : '最新版'), 'ok');
+    toast('已拉取远程最新版');
+  } catch(err) {
+    setRemoteStatus('拉取失败: ' + err.message, 'err');
+    // 拉取失败不覆盖本地，保持原样
+  }
+}
+
+async function pushNow() {
+  const token = localStorage.getItem(PUSH_TOKEN_KEY);
+  if (!token) {
+    openSyncSettings();
+    return;
+  }
+  setRemoteStatus('推送中…', 'sync');
+  try {
+    const contentsUrl = `https://api.github.com/repos/${REMOTE.owner}/${REMOTE.repo}/contents/${REMOTE.file}`;
+    // 1. GET 拿 sha
+    const getRes = await fetch(contentsUrl, {
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!getRes.ok) throw new Error('GET ' + getRes.status);
+    const info = await getRes.json();
+    const sha = info.sha;
+    // 2. PUT 更新
+    const toPush = JSON.stringify({ ...state, updatedAt: new Date().toISOString() });
+    const base64 = btoa(unescape(encodeURIComponent(toPush)));
+    const putRes = await fetch(contentsUrl, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'sync data', content: base64, sha: sha, branch: REMOTE.branch })
+    });
+    if (!putRes.ok) {
+      const d = await putRes.json().catch(() => ({}));
+      throw new Error((d.message || 'HTTP ' + putRes.status).slice(0, 60));
+    }
+    setRemoteStatus('推送成功 ' + new Date().toLocaleTimeString(), 'ok');
+    toast('✅ 已推送至仓库');
+  } catch(err) {
+    setRemoteStatus('推送失败: ' + err.message, 'err');
+    toast('推送失败: ' + err.message);
+  }
+}
+
+function openSyncSettings() {
+  const existing = localStorage.getItem(PUSH_TOKEN_KEY);
+  const v = prompt(
+    '🔑 管理员推送设置\n\n' +
+    'GitHub Personal Access Token（需要 Contents 写权限）\n' +
+    '留空或点取消则仅能拉取，不能推送。\n\n' +
+    '创建: https://github.com/settings/tokens → Fine-grained → All repositories → Contents: Read and write\n\n' +
+    (existing ? '当前已设置，输入新值覆盖，输入 CLEAR 清除：' : '粘贴你的 token 后点确定：')
+  );
+  if (v === null) return;
+  v = v.trim();
+  if (!v) {
+    // 不做改变
+  } else if (v.toUpperCase() === 'CLEAR') {
+    localStorage.removeItem(PUSH_TOKEN_KEY);
+    toast('已清除 token');
+  } else {
+    localStorage.setItem(PUSH_TOKEN_KEY, v);
+    toast('✅ 已保存 token，现在可以推送了');
+  }
+}
+
+// 启动时尝试自动拉取
+pullLatest();
 </script>
 </body>
 </html>
