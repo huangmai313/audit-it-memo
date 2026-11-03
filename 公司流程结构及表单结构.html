@@ -1535,6 +1535,14 @@ function openSyncSettings() {
 
 // 启动时尝试自动拉取
 pullLatest();
+// 每 3 分钟静默检查一次更新
+setInterval(() => {
+  if (!document.hidden) pullLatest();
+}, 3 * 60 * 1000);
+// 用户切回此标签页时自动拉取
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) pullLatest();
+});
 </script>
 </body>
 </html>
