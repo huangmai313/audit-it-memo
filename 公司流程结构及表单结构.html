@@ -408,6 +408,9 @@ body.panel-collapsed .panel-toggle{right:0}
           <span id="remoteDot" class="dot"></span>
           <span id="remoteText">正在同步…</span>
         </div>
+        <div class="remote-status-bar" style="margin-bottom:8px">
+          <span id="tokenIndicator" style="font-size:11px;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626">🔒 未配置推送</span>
+        </div>
         <div class="remote-actions">
           <button class="btn sm" onclick="pullLatest()" title="从仓库拉取最新版">⬇️ 拉取</button>
           <button class="btn sm" onclick="pushNow()" title="推送当前数据到仓库（需管理员 token）">⬆️ 推送</button>
@@ -1446,6 +1449,21 @@ function setRemoteStatus(text, dotCls) {
   if (txt) txt.textContent = text;
 }
 
+function refreshTokenIndicator() {
+  const el = document.getElementById('tokenIndicator');
+  if (!el) return;
+  const token = localStorage.getItem(PUSH_TOKEN_KEY);
+  if (token) {
+    el.textContent = '🔑 推送已就绪';
+    el.style.background = '#dcfce7';
+    el.style.color = '#16a34a';
+  } else {
+    el.textContent = '🔒 未配置推送';
+    el.style.background = '#fee2e2';
+    el.style.color = '#dc2626';
+  }
+}
+
 async function pullLatest() {
   setRemoteStatus('拉取中…', 'sync');
   const url = `https://raw.githubusercontent.com/${REMOTE.owner}/${REMOTE.repo}/${REMOTE.branch}/${REMOTE.file}?t=${Date.now()}`;
@@ -1531,9 +1549,11 @@ function openSyncSettings() {
     localStorage.setItem(PUSH_TOKEN_KEY, v);
     toast('✅ 已保存 token，现在可以推送了');
   }
+  refreshTokenIndicator();
 }
 
 // 启动时尝试自动拉取
+refreshTokenIndicator();
 pullLatest();
 // 每 3 分钟静默检查一次更新
 setInterval(() => {
