@@ -643,10 +643,7 @@ function defaultData() {
 
 /* ===================== 持久化 ===================== */
 function save() {
-  state._dirty = true;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) { console.error('Save failed:', e); }
-  // 侧边栏改了时，刷新远端状态区提醒用户点推送
-  setTimeout(refreshRemoteDirty, 0);
 }
 function load() {
   try {
@@ -1498,7 +1495,6 @@ async function pullLatestBoot() {
     normalizePages(state.pages);
     state.viewRootId = null;
     selectedNodeId = null;
-    state._dirty = false;
     save();
     setRemoteStatus('已同步 ' + (remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : '最新版'), 'ok');
     return true;
@@ -1526,22 +1522,6 @@ function setRemoteStatus(text, dotCls) {
   const txt = document.getElementById('remoteText');
   if (dot) { dot.className = 'dot'; if (dotCls) dot.classList.add(dotCls); }
   if (txt) txt.textContent = text;
-  refreshRemoteDirty();
-}
-
-function refreshRemoteDirty() {
-  const txt = document.getElementById('remoteText');
-  const dot = document.getElementById('remoteDot');
-  if (!txt || !dot) return;
-  if (state._dirty) {
-    // 有本地未推送修改，在已有文字后面加 ⚠️ 提示
-    if (!txt.textContent.includes('⚠️')) {
-      dot.classList.remove('ok');
-      dot.classList.add('sync');
-      const base = txt.textContent.replace(/\s*⚠️.*$/, '');
-      txt.textContent = base + ' ⚠️ 有未推送修改';
-    }
-  }
 }
 
 function refreshTokenIndicator() {
@@ -1576,7 +1556,6 @@ async function pullLatest() {
     normalizePages(state.pages);
     state.viewRootId = null;
     selectedNodeId = null;
-    state._dirty = false;
     save();
     renderPageList();
     renderTree();
@@ -1618,7 +1597,6 @@ async function pushNow() {
       throw new Error((d.message || 'HTTP ' + putRes.status).slice(0, 60));
     }
     setRemoteStatus('推送成功 ' + new Date().toLocaleTimeString(), 'ok');
-    state._dirty = false;
     save();
     toast('✅ 已推送至仓库');
   } catch(err) {
