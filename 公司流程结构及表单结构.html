@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>公司流程结构及表单结构</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1f4e78;--navy-d:#173c5e;--ink:#1a1a2e;
+  --bg:#f4f6f9;--line:#e3e8ef;--muted:#64748b;
+  --node-w:180px;--node-h:52px;--h-gap:60px;--v-gap:12px;
+  --accent:#3b82f6;--success:#10b981;--danger:#ef4444;--warn:#f59e0b;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;
+  color:var(--ink);font-size:14px;background:var(--bg);
+}
+
+/* ========= 布局 ========= */
+.app{display:flex;height:100vh}
+.sidebar{
+  width:240px;background:#fff;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;flex-shrink:0;
+}
+.sidebar-header{
+  padding:16px 14px;border-bottom:1px solid var(--line);
+}
+.sidebar-header h1{font-size:15px;color:var(--navy);font-weight:700}
+.sidebar-header .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+.page-list{flex:1;overflow-y:auto;padding:10px 8px}
+.page-item{
+  padding:10px 12px;border-radius:6px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;margin-bottom:2px;
+  transition:.15s;user-select:none;position:relative;
+}
+.page-item:hover{background:#f0f4fa}
+.page-item.active{background:var(--navy);color:#fff}
+.page-item.active .page-icon{color:#fff}
+.page-item .page-icon{font-size:14px;color:var(--navy)}
+.page-item .page-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-item .page-count{
+  font-size:11px;background:rgba(0,0,0,.08);padding:2px 6px;border-radius:10px;
+}
+.page-item.active .page-count{background:rgba(255,255,255,.25)}
+.page-item .rename-input{
+  width:100%;border:none;background:transparent;color:inherit;font:inherit;outline:none;
+}
+/* 页面模块的删除按钮：悬停或选中时显示 */
+.page-item .page-del-btn{
+  width:18px;height:18px;border-radius:50%;border:none;
+  background:#fee2e2;color:#ef4444;font-size:11px;line-height:1;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  flex-shrink:0;transition:.15s;margin-left:2px;
+}
+.page-item:hover .page-del-btn{display:flex}
+.page-item.active .page-del-btn{display:flex}
+.page-del-btn:hover{background:#ef4444;color:#fff}
+.page-item .page-menu-btn{opacity:0}
+.page-item:hover .page-menu-btn{opacity:.6}
+.page-item.active .page-menu-btn{opacity:.7}
+
+.sidebar-footer{
+  padding:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;
+}
+.btn{
+  font-family:inherit;font-size:12.5px;border:1px solid var(--line);background:#fff;color:#334155;
+  padding:8px 12px;border-radius:6px;cursor:pointer;transition:.15s;text-align:center;
+}
+.btn:hover{border-color:var(--navy);color:var(--navy)}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover{background:var(--navy-d);color:#fff}
+.btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ========= 主内容区 ========= */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.toolbar{
+  padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;
+}
+.toolbar .page-title{
+  font-size:16px;font-weight:700;color:var(--navy);margin-right:auto;
+}
+.toolbar .tools{display:flex;gap:6px}
+
+/* ========= 画布区 ========= */
+.canvas-wrap{flex:1;overflow:auto;position:relative;background:var(--bg);min-height:0}
+.canvas-wrap::-webkit-scrollbar{width:10px;height:10px}
+.canvas-wrap::-webkit-scrollbar-thumb{background:#c1cdd9;border-radius:5px}
+.canvas-wrap::-webkit-scrollbar-track{background:#eef1f5}
+
+.canvas{
+  position:relative;min-width:100%;min-height:100%;padding:40px;
+}
+.svg-layer{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;overflow:visible;
+}
+.svg-layer line{stroke:#94a3b8;stroke-width:1.5;fill:none}
+.svg-line{pointer-events:auto}
+.svg-line:hover{stroke:var(--navy);stroke-width:2}
+
+.tree{position:relative;padding-left:10px}
+.node-row{display:flex;align-items:flex-start}
+.node-cell{
+  position:relative;width:var(--node-w);flex-shrink:0;
+}
+.node{
+  width:100%;height:var(--node-h);
+  background:#fff;border:2px solid var(--line);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 28px 0 12px;cursor:pointer;transition:.15s;
+  font-size:13px;font-weight:500;text-align:center;
+  position:relative;z-index:2;user-select:none;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.node:hover{border-color:var(--navy);box-shadow:0 2px 8px rgba(31,78,120,.15)}
+.node-delete-btn{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:18px;height:18px;border-radius:50%;border:none;
+  background:#fee2e2;color:#ef4444;font-size:11px;line-height:1;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  z-index:4;transition:.15s;
+}
+.node:not(.root):hover .node-delete-btn{display:flex}
+.node-delete-btn:hover{background:#ef4444;color:#fff;transform:translateY(-50%) scale(1.15)}
+.node.root{padding-right:12px}
+.node.selected:not(.root) .node-delete-btn{display:flex}
+.node.selected{border-color:var(--accent);background:#eff6ff;box-shadow:0 2px 8px rgba(59,130,246,.25)}
+.node.root{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.node.root:hover{background:var(--navy-d)}
+.node.with-form::after{
+  content:"📋";position:absolute;top:-8px;right:-8px;font-size:11px;
+  background:#fff;border:1px solid var(--line);border-radius:50%;
+  width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+}
+
+.node-children{
+  margin-left:calc(var(--node-w) + var(--h-gap));
+}
+.node-children.collapsed{display:none}
+
+.toggle-btn{
+  position:absolute;left:calc(-1 * var(--h-gap) / 2 - 8px);top:50%;transform:translateY(-50%);
+  width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid var(--line);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:var(--muted);z-index:3;line-height:1;
+}
+.toggle-btn:hover{border-color:var(--navy);color:var(--navy)}
+.toggle-btn.leaf{display:none}
+
+/* 根节点的子节点从根节点右侧延伸 */
+.root-children{margin-left:calc(var(--node-w) + var(--h-gap))}
+
+/* ========= 右键菜单 ========= */
+.context-menu{
+  position:fixed;background:#fff;border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px 0;min-width:160px;
+  z-index:1000;display:none;
+}
+.context-menu.show{display:block}
+.context-menu .menu-item{
+  padding:8px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;
+}
+.context-menu .menu-item:hover{background:#f0f4fa;color:var(--navy)}
+.context-menu .menu-item.danger:hover{background:#fef2f2;color:var(--danger)}
+.context-menu .menu-item.sep{height:1px;background:var(--line);padding:0;margin:4px 0}
+
+/* ========= 表单侧边面板 ========= */
+.form-panel{
+  width:420px;background:#fff;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;flex-shrink:0;
+  transition:width .25s ease, opacity .2s;
+  overflow:hidden;position:relative;
+}
+.form-panel.collapsed{width:0;border-left:none}
+.panel-toggle{
+  position:fixed;right:420px;top:50%;transform:translateY(-50%);
+  width:20px;height:52px;background:#fff;border:1px solid var(--line);
+  border-right:none;border-radius:8px 0 0 8px;
+  cursor:pointer;font-size:11px;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  z-index:20;transition:right .25s,color .15s;
+  box-shadow:-2px 0 8px rgba(0,0,0,.08);
+}
+.panel-toggle:hover{color:var(--navy);box-shadow:-2px 0 12px rgba(0,0,0,.12)}
+.form-panel.collapsed ~ .panel-toggle,
+body.panel-collapsed .panel-toggle{right:0}
+.form-panel-header{
+  padding:14px 16px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.form-panel-header h3{font-size:14px;color:var(--navy);flex:1}
+.form-panel-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:0}
+.form-panel-tabs .tab{
+  padding:8px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;
+  border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;
+  transition:.15s;
+}
+.form-panel-tabs .tab:hover{color:var(--navy)}
+.form-panel-tabs .tab.active{
+  background:var(--navy);color:#fff;border-color:var(--navy);
+}
+.form-panel.empty{display:flex;align-items:center;justify-content:center}
+.empty-hint{text-align:center;color:var(--muted);padding:40px 20px;line-height:1.8}
+.empty-hint .icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.empty-hint .tip{font-size:12px;margin-top:8px}
+
+/* ========= 子表 / 明细表格字段 ========= */
+.subform-field{
+  margin-top:6px;border:1px dashed var(--line);border-radius:6px;
+  padding:8px;background:#f9fafb;
+}
+.subform-field .sub-col-title{
+  font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:6px;
+}
+.subform-field .sub-cols{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.subform-field .sub-col{
+  display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fff;border:1px solid var(--line);border-radius:4px;
+}
+.subform-field .sub-col input[type=text],
+.subform-field .sub-col select{
+  padding:4px 7px;border:1px solid var(--line);border-radius:3px;font-family:inherit;font-size:12px;outline:none;
+}
+.subform-field .sub-col input[type=text]{flex:1;min-width:0}
+.subform-field .sub-col select{width:110px}
+.subform-field .sub-col .del-col{
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;
+}
+.subform-field .sub-col .del-col:hover{color:var(--danger)}
+.subform-field .add-col{
+  padding:5px 10px;border:1px dashed var(--line);background:transparent;border-radius:4px;
+  cursor:pointer;color:var(--muted);font-family:inherit;font-size:12px;width:100%;
+}
+.subform-field .add-col:hover{border-color:var(--navy);color:var(--navy)}
+.subform-field .sub-col-req{
+  display:flex;align-items:center;gap:2px;font-size:11px;color:var(--muted);flex-shrink:0;
+}
+.subform-field .sub-col-req input{margin:0}
+.subform-field .sub-col-group{margin-bottom:4px}
+.subform-field .sub-col-opts{padding:4px 0 6px 0}
+.subform-field .sub-col-opts textarea{
+  width:100%;min-height:44px;padding:4px 6px;border:1px solid var(--line);border-radius:3px;
+  font-family:inherit;font-size:11.5px;resize:vertical;background:#fff;
+}
+
+
+
+.form-section{margin-bottom:20px}
+.form-section-label{
+  font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:8px;font-weight:600;
+}
+.node-name-input{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;
+  font-family:inherit;font-size:14px;outline:none;
+}
+.node-name-input:focus{border-color:var(--navy)}
+
+.field-list{display:flex;flex-direction:column;gap:8px}
+.field-item{
+  border:1px solid var(--line);border-radius:6px;padding:10px 12px;
+  background:#fafbfc;display:flex;align-items:center;gap:8px;
+  position:relative;flex-wrap:wrap;
+}
+.field-item .field-label{
+  flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.field-item .field-type{
+  font-size:11px;color:var(--muted);background:#eef1f5;padding:2px 8px;border-radius:4px;
+}
+.field-item .field-actions{display:flex;gap:4px;flex-shrink:0}
+.field-item .field-actions button{
+  background:none;border:none;cursor:pointer;font-size:14px;padding:2px;
+  color:var(--muted);
+}
+.field-item .field-actions button:hover{color:var(--navy)}
+.field-item .field-actions button.del:hover{color:var(--danger)}
+.field-item .field-actions .detail-btn{
+  font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:3px;
+  background:#fff;font-family:inherit;
+}
+.field-item .field-actions .detail-btn:hover{color:var(--navy);border-color:var(--navy)}
+.field-item .field-detail{
+  flex:1 0 100%;margin-top:8px;padding:10px 12px;
+  border-top:1px dashed var(--line);padding-top:10px;
+  font-size:12px;color:#475569;
+  display:none;
+}
+.field-item.has-detail.expanded .field-detail{display:block}
+.field-item .field-detail .fd-row{display:flex;gap:8px;margin-bottom:4px;align-items:center}
+.field-item .field-detail .fd-row:last-child{margin-bottom:0}
+.field-item .field-detail .fd-label{color:var(--muted);min-width:56px;flex-shrink:0;font-size:11px}
+.field-item .field-detail .fd-value{flex:1}
+.field-item .field-detail .fd-chips{display:flex;flex-wrap:wrap;gap:4px}
+.field-item .field-detail .fd-chip{
+  font-size:11px;padding:2px 7px;background:#eef1f5;border-radius:3px;color:#334155;
+}
+.field-item .field-detail .fd-cols{display:flex;flex-direction:column;gap:4px}
+.field-item .field-detail .fd-col{
+  display:flex;gap:6px;padding:3px 6px;background:#fff;border:1px solid var(--line);border-radius:3px;
+  align-items:center;font-size:11.5px;
+}
+.field-item .field-detail .fd-col .col-n{font-weight:600;color:var(--navy);min-width:56px}
+.field-item .field-detail .fd-col .col-t{color:var(--muted);background:#eef1f5;padding:1px 6px;border-radius:2px;font-size:10px}
+.field-item .field-detail .fd-col .col-req{color:var(--danger);font-weight:700;margin-left:auto}
+.field-item .field-detail .fd-col-opts{
+  padding:2px 0 6px 60px;display:flex;flex-wrap:wrap;gap:4px;
+}
+.field-item .field-detail .fd-col-opts .fd-chip{
+  font-size:10.5px;padding:1px 6px;background:#f1f5f9;border-radius:2px;color:#64748b;
+}
+
+.add-field-btn{
+  width:100%;padding:10px;border:2px dashed var(--line);background:transparent;
+  border-radius:6px;cursor:pointer;color:var(--muted);font-family:inherit;font-size:13px;
+}
+.add-field-btn:hover{border-color:var(--navy);color:var(--navy)}
+
+/* 字段下拉选项编辑 */
+.options-editor{margin-top:6px;display:none}
+.options-editor.show{display:block}
+.options-editor textarea{
+  width:100%;min-height:60px;padding:8px;border:1px solid var(--line);border-radius:6px;
+  font-family:inherit;font-size:12px;resize:vertical;
+}
+
+/* ========= 模态框 ========= */
+.modal-overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:2000;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:#fff;border-radius:10px;padding:24px;min-width:380px;max-width:90vw;max-height:90vh;
+  display:flex;flex-direction:column;
+}
+.modal h3{font-size:15px;color:var(--navy);margin-bottom:14px}
+.modal label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;margin-top:8px}
+.modal input,.modal select{
+  width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;
+  font-family:inherit;font-size:13px;outline:none;
+}
+.modal input:focus,.modal select:focus{border-color:var(--navy)}
+.modal .modal-actions{
+  display:flex;gap:8px;justify-content:flex-end;margin-top:18px;
+}
+.modal .form-row{display:flex;gap:8px}
+.modal .form-row > *{flex:1}
+
+/* ========= 工具栏图标按钮 ========= */
+.icon-btn{
+  width:32px;height:32px;border:1px solid var(--line);background:#fff;border-radius:6px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:15px;color:var(--muted);transition:.15s;
+}
+.icon-btn:hover{border-color:var(--navy);color:var(--navy)}
+.icon-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* ========= 状态提示 ========= */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:#1f2937;color:#fff;padding:10px 20px;border-radius:6px;
+  font-size:13px;z-index:3000;opacity:0;transition:opacity .25s;pointer-events:none;
+}
+.toast.show{opacity:1}
+
+/* 隐藏文件输入 */
+#fileImport{display:none}
+
+/* 折叠状态 */
+.node.collapsed::before{
+  content:"…";position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  font-size:16px;color:var(--muted);
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- 左侧导航栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>📊 流程结构</h1>
+      <div class="sub">公司流程结构及表单结构</div>
+    </div>
+    <div class="page-list" id="pageList"></div>
+    <div class="sidebar-footer">
+      <button class="btn primary" id="btnAddPage">＋ 新增流程页面</button>
+      <button class="btn" id="btnImport">📥 导入数据</button>
+      <button class="btn" id="btnExport">📤 导出数据</button>
+      <input type="file" id="fileImport" accept=".json">
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main">
+    <div class="toolbar">
+      <div class="page-title" id="pageTitle">—</div>
+      <div class="tools">
+        <button class="btn" id="btnAddRootChild" title="添加根节点子项">＋ 子节点</button>
+        <button class="btn" id="btnZoomFit" title="适应画布">⤢ 适应</button>
+        <button class="btn" id="btnZoomIn" title="放大">＋</button>
+        <button class="btn" id="btnZoomOut" title="缩小">－</button>
+        <button class="btn" id="btnReset" title="重置当前页面">🔄 重置</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="canvas" id="canvas">
+        <svg class="svg-layer" id="svgLayer"></svg>
+        <div class="tree" id="treeRoot"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 表单侧边面板（编辑字段） -->
+  <aside class="form-panel empty" id="formPanel">
+    <div class="form-panel-header">
+      <h3>⚙️ 表单字段编辑</h3>
+      <button class="icon-btn" onclick="toggleFormPanel()" title="隐藏面板" style="width:24px;height:24px;font-size:16px">✕</button>
+    </div>
+    <div class="form-panel-body" id="formPanelBody">
+      <div class="empty-hint">
+        <div class="icon">📋</div>
+        <div>点击任意业务节点<br>查看或编辑表单结构</div>
+        <div class="tip">• 字段支持 10 种类型<br>• 下拉/单选支持自定义选项<br>• 有表单的节点右上显示 📋</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- 右键菜单 -->
+<div class="context-menu" id="contextMenu">
+  <div class="menu-item" data-action="addChild">➕ 添加子节点</div>
+  <div class="menu-item" data-action="rename">✏️ 重命名</div>
+  <div class="menu-item" data-action="setRoot">📍 设为根节点</div>
+  <div class="menu-item sep"></div>
+  <div class="menu-item danger" data-action="delete">🗑️ 删除节点</div>
+</div>
+
+<!-- 模态框：编辑字段 -->
+<div class="modal-overlay" id="fieldModal">
+  <div class="modal" style="min-width:420px">
+    <h3 id="fieldModalTitle">添加表单字段</h3>
+    <label>字段名称</label>
+    <input type="text" id="fieldLabel" placeholder="例如：申请人姓名">
+    <label>字段类型</label>
+    <select id="fieldType">
+      <option value="text">单行文本</option>
+      <option value="textarea">多行文本</option>
+      <option value="number">数字</option>
+      <option value="date">日期</option>
+      <option value="select">下拉选择</option>
+      <option value="checkbox">复选框</option>
+      <option value="radio">单选</option>
+      <option value="file">文件上传</option>
+      <option value="tel">电话</option>
+      <option value="email">邮箱</option>
+      <option value="subform">子表（可增删行）</option>
+    </select>
+    <div id="optionsEditor" class="options-editor">
+      <label>下拉/单选/复选的选项（每行一个）</label>
+      <textarea id="fieldOptions" placeholder="选项1&#10;选项2&#10;选项3"></textarea>
+    </div>
+    <div id="subformEditor" class="subform-field" style="display:none">
+      <div class="sub-col-title">子表的列（每个列就是一个子字段）</div>
+      <div class="sub-cols" id="subCols"></div>
+      <button type="button" class="add-col" onclick="addSubCol()">＋ 添加一列</button>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>是否必填</label>
+        <select id="fieldRequired">
+          <option value="false">否</option>
+          <option value="true">是</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFieldModal()">取消</button>
+      <button class="btn primary" onclick="saveField()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框：新建页面 -->
+<div class="modal-overlay" id="pageModal">
+  <div class="modal">
+    <h3>新增流程页面</h3>
+    <label>流程名称</label>
+    <input type="text" id="pageName" placeholder="例如：采购审批流程">
+    <label>根节点名称</label>
+    <input type="text" id="rootName" placeholder="例如：采购">
+    <div class="modal-actions">
+      <button class="btn" onclick="closePageModal()">取消</button>
+      <button class="btn primary" onclick="saveNewPage()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框：导入确认 -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h3>确认导入</h3>
+    <p id="importInfo" style="font-size:13px;color:var(--muted);line-height:1.6"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeImportModal()">取消</button>
+      <button class="btn primary" onclick="confirmImport()">覆盖当前数据</button>
+    </div>
+  </div>
+</div>
+
+<!-- 表单面板固定 toggle 按钮（独立于 form-panel，折叠后仍可见） -->
+<button class="panel-toggle" id="panelToggleBtn" onclick="toggleFormPanel()" title="隐藏表单面板">◀</button>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== 数据模型 ===================== */
+const STORAGE_KEY = 'company_process_structure_v1';
+let state = { pages: [], currentPageId: null, zoom: 1, viewRootId: null, panelCollapsed: false };
+let selectedNodeId = null;
+let contextTargetId = null;
+let editingFieldIndex = -1;
+const expandedFields = new Set(); // "fieldId" → 是否展开
+
+function genId() { return 'n_' + Math.random().toString(36).slice(2, 10); }
+
+function defaultData() {
+  const page = {
+    id: genId(),
+    name: '示例流程',
+    viewRootId: null,
+    root: {
+      id: genId(), text: '公司流程结构', collapsed: false, form: [],
+      children: [
+        {
+          id: genId(), text: '采购流程', collapsed: false,
+          form: [
+            { id: genId(), label: '申请人', type: 'text', required: true },
+            { id: genId(), label: '申请日期', type: 'date', required: true },
+            { id: genId(), label: '采购金额', type: 'number', required: true },
+            { id: genId(), label: '备注', type: 'textarea', required: false }
+          ],
+          children: [
+            { id: genId(), text: '部门审批', collapsed: false, form: [], children: [] },
+            { id: genId(), text: '财务审批', collapsed: false, form: [], children: [] },
+            { id: genId(), text: '供应商选择', collapsed: false, form: [], children: [] }
+          ]
+        },
+        {
+          id: genId(), text: '销售流程', collapsed: false, form: [],
+          children: [
+            { id: genId(), text: '客户询价', collapsed: false, form: [], children: [] },
+            { id: genId(), text: '报价单', collapsed: false, form: [], children: [] },
+            { id: genId(), text: '合同签订', collapsed: false, form: [], children: [] }
+          ]
+        },
+        {
+          id: genId(), text: '费用报销', collapsed: false,
+          form: [
+            { id: genId(), label: '报销人', type: 'text', required: true },
+            { id: genId(), label: '部门', type: 'select', required: true, options: ['财务部','市场部','销售部','技术部'] },
+            { id: genId(), label: '金额', type: 'number', required: true },
+            { id: genId(), label: '发票', type: 'file', required: true }
+          ],
+          children: []
+        },
+        {
+          id: genId(), text: '人力资源', collapsed: false, form: [],
+          children: [
+            { id: genId(), text: '入职流程', collapsed: false, form: [], children: [] },
+            { id: genId(), text: '离职流程', collapsed: false, form: [], children: [] }
+          ]
+        }
+      ]
+    }
+  };
+  return { pages: [page], currentPageId: page.id, zoom: 1, panelCollapsed: false };
+}
+
+/* ===================== 持久化 ===================== */
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) { console.error('Save failed:', e); }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.pages && parsed.pages.length) { state = parsed; return; }
+    }
+  } catch(e) { console.warn('Load failed:', e); }
+  state = defaultData();
+  save();
+}
+
+/* ===================== 工具函数 ===================== */
+function getCurrentPage() {
+  return state.pages.find(p => p.id === state.currentPageId);
+}
+function findNode(node, id) {
+  if (node.id === id) return node;
+  for (const c of node.children || []) {
+    const r = findNode(c, id);
+    if (r) return r;
+  }
+  return null;
+}
+function findParent(node, id) {
+  for (const c of node.children || []) {
+    if (c.id === id) return { parent: node, child: c };
+    const r = findParent(c, id);
+    if (r) return r;
+  }
+  return null;
+}
+function countNodes(node) {
+  let count = 1;
+  for (const c of node.children || []) count += countNodes(c);
+  return count;
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ===================== 左侧导航渲染 ===================== */
+function renderPageList() {
+  const list = document.getElementById('pageList');
+  list.innerHTML = state.pages.map(p => {
+    const isActive = p.id === state.currentPageId;
+    const count = countNodes(p.root);
+    return `<div class="page-item ${isActive?'active':''}" data-id="${p.id}" onclick="switchPage('${p.id}')"
+                oncontextmenu="showPageMenu(event,'${p.id}')">
+      <span class="page-icon">📁</span>
+      <span class="page-name">${esc(p.name)}</span>
+      <span class="page-count">${count}</span>
+      <button class="page-del-btn" onclick="event.stopPropagation();deletePage('${p.id}')" title="删除此模块">✕</button>
+      <button class="page-menu-btn icon-btn" style="width:20px;height:20px;font-size:11px;background:transparent;border:none;margin-left:2px" 
+        onclick="event.stopPropagation();showPageMenu(event,'${p.id}')" title="更多">⋯</button>
+    </div>`;
+  }).join('');
+}
+
+/* ===================== 切换页面 ===================== */
+function switchPage(pageId) {
+  state.currentPageId = pageId;
+  state.viewRootId = null;
+  selectedNodeId = null;
+  renderPageList();
+  renderTree();
+  renderFormPanel();
+  save();
+}
+
+/* ===================== 页面右键菜单 ===================== */
+function showPageMenu(e, pageId) {
+  e.stopPropagation();
+  if (e.type === 'contextmenu') e.preventDefault();
+  document.querySelectorAll('body > .context-menu').forEach(m => m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'context-menu show';
+  menu.innerHTML = `
+    <div class="menu-item" onclick="renamePage('${pageId}')">✏️ 重命名</div>
+    <div class="menu-item danger" onclick="deletePage('${pageId}')">🗑️ 删除模块</div>
+  `;
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    const handler = (ev) => {
+      if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', handler); }
+    };
+    document.addEventListener('click', handler);
+  }, 10);
+}
+
+function renamePage(pageId) {
+  const page = state.pages.find(p => p.id === pageId);
+  const name = prompt('重命名页面：', page.name);
+  if (name && name.trim()) {
+    page.name = name.trim();
+    save(); renderPageList();
+  }
+}
+
+function deletePage(pageId) {
+  if (state.pages.length <= 1) { toast('至少保留一个页面'); return; }
+  const page = state.pages.find(p => p.id === pageId);
+  if (!confirm(`确定删除「${page.name}」？此操作不可撤销。`)) return;
+  state.pages = state.pages.filter(p => p.id !== pageId);
+  if (state.currentPageId === pageId) state.currentPageId = state.pages[0].id;
+  state.viewRootId = null; selectedNodeId = null;
+  save(); renderPageList(); renderTree(); renderFormPanel();
+}
+
+/* ===================== 树状图渲染 ===================== */
+function renderTree() {
+  const page = getCurrentPage();
+  if (!page) return;
+
+  document.getElementById('pageTitle').textContent = page.name;
+
+  const treeRoot = document.getElementById('treeRoot');
+  const svg = document.getElementById('svgLayer');
+  svg.innerHTML = '';
+
+  const rootId = state.viewRootId || page.root.id;
+  const rootNode = findNode(page.root, rootId);
+  if (!rootNode) { state.viewRootId = null; return renderTree(); }
+
+  // 应用缩放
+  treeRoot.style.transform = `scale(${state.zoom})`;
+  treeRoot.style.transformOrigin = 'top left';
+
+  treeRoot.innerHTML = renderNode(rootNode, true);
+
+  // 绘制连线
+  requestAnimationFrame(() => drawConnections(rootNode));
+}
+
+function renderNode(node, isRoot) {
+  const hasChildren = (node.children || []).length > 0;
+  const isCollapsed = node.collapsed && hasChildren;
+  const selected = selectedNodeId === node.id;
+  const hasForm = node.form && node.form.length > 0;
+
+  let html = `<div class="node-row">`;
+  html += `<div class="node-cell">`;
+  html += `<div class="node ${isRoot?'root':''} ${selected?'selected':''} ${isCollapsed?'collapsed':''} ${hasForm?'with-form':''}" 
+             data-id="${node.id}"
+             ondblclick="renameNode('${node.id}')"
+             oncontextmenu="showContextMenu(event,'${node.id}')"
+             onclick="selectNode('${node.id}')">
+    ${esc(node.text)}
+    ${!isRoot ? `<button class="node-delete-btn" onclick="event.stopPropagation();deleteNode('${node.id}')" title="删除此节点">✕</button>` : ''}
+  </div>`;
+
+  if (hasChildren) {
+    html += `<button class="toggle-btn ${isCollapsed?'leaf':''}" 
+              onclick="event.stopPropagation();toggleNode('${node.id}')" 
+              title="${isCollapsed?'展开':'折叠'}">${isCollapsed?'▶':'−'}</button>`;
+  }
+  html += `</div>`;
+
+  if (!isCollapsed && hasChildren) {
+    html += `<div class="node-children">`;
+    node.children.forEach(c => { html += renderNode(c, false); });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/* ===================== 绘制连线 ===================== */
+function drawConnections(rootNode) {
+  const svg = document.getElementById('svgLayer');
+  const svgRect = svg.getBoundingClientRect();
+  const canvas = document.getElementById('canvas');
+  const canvasRect = canvas.getBoundingClientRect();
+
+  const offsetX = canvasRect.left - svgRect.left + canvas.scrollLeft;
+  const offsetY = canvasRect.top - svgRect.top + canvas.scrollTop;
+
+  function connect(node) {
+    const nodeEl = document.querySelector(`.node[data-id="${node.id}"]`);
+    if (!nodeEl) return;
+    const nodeRect = nodeEl.getBoundingClientRect();
+    const x1 = nodeRect.right - svgRect.left + canvas.scrollLeft;
+    const y1 = nodeRect.top + nodeRect.height / 2 - svgRect.top + canvas.scrollTop;
+
+    const childrenContainer = nodeEl.parentElement.nextElementSibling;
+    if (!childrenContainer || !childrenContainer.classList.contains('node-children')) return;
+
+    const childNodes = childrenContainer.querySelectorAll(':scope > .node-row > .node-cell > .node');
+    childNodes.forEach(childEl => {
+      const childRect = childEl.getBoundingClientRect();
+      const x2 = childRect.left - svgRect.left + canvas.scrollLeft;
+      const y2 = childRect.top + childRect.height / 2 - svgRect.top + canvas.scrollTop;
+
+      const midX = (x1 + x2) / 2;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+      path.setAttribute('stroke', '#94a3b8');
+      path.setAttribute('stroke-width', '1.5');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('class', 'svg-line');
+      svg.appendChild(path);
+    });
+
+    if (!node.collapsed) {
+      (node.children || []).forEach(c => connect(c));
+    }
+  }
+
+  connect(rootNode);
+}
+
+/* ===================== 交互：选择节点 ===================== */
+function selectNode(nodeId) {
+  selectedNodeId = nodeId;
+  renderTree();
+  renderFormPanel();
+}
+
+/* ===================== 交互：添加子节点 ===================== */
+function addChildNode(parentId) {
+  const page = getCurrentPage();
+  const parent = findNode(page.root, parentId);
+  if (!parent) return;
+  const name = prompt('子节点名称：', '新节点');
+  if (!name || !name.trim()) return;
+  if (!parent.children) parent.children = [];
+  parent.children.push({ id: genId(), text: name.trim(), collapsed: false, form: [], children: [] });
+  parent.collapsed = false;
+  save(); renderTree();
+}
+
+function renameNode(nodeId) {
+  const page = getCurrentPage();
+  const node = findNode(page.root, nodeId);
+  if (!node) return;
+  const name = prompt('重命名：', node.text);
+  if (name && name.trim()) {
+    node.text = name.trim();
+    save(); renderTree();
+  }
+}
+
+function deleteNode(nodeId) {
+  const page = getCurrentPage();
+  if (page.root.id === nodeId) { toast('根节点不能删除'); return; }
+  const info = findParent(page.root, nodeId);
+  if (!info) return;
+  const node = info.child;
+  if (!confirm(`确定删除「${node.text}」及其所有子节点？`)) return;
+  info.parent.children = info.parent.children.filter(c => c.id !== nodeId);
+  if (selectedNodeId === nodeId) selectedNodeId = info.parent.id;
+  save(); renderTree(); renderFormPanel();
+}
+
+function toggleNode(nodeId) {
+  const page = getCurrentPage();
+  const node = findNode(page.root, nodeId);
+  if (node && node.children && node.children.length) {
+    node.collapsed = !node.collapsed;
+    save(); renderTree();
+  }
+}
+
+function setViewRoot(nodeId) {
+  state.viewRootId = nodeId;
+  renderTree();
+  toast('已设为当前视图根节点');
+}
+
+/* ===================== 右键菜单 ===================== */
+function showContextMenu(e, nodeId) {
+  e.preventDefault();
+  e.stopPropagation();
+  contextTargetId = nodeId;
+  const menu = document.getElementById('contextMenu');
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.classList.add('show');
+  const handler = () => { menu.classList.remove('show'); document.removeEventListener('click', handler); };
+  document.addEventListener('click', handler);
+}
+
+document.querySelectorAll('#contextMenu .menu-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const action = item.dataset.action;
+    const id = contextTargetId;
+    contextTargetId = null;
+    document.getElementById('contextMenu').classList.remove('show');
+    if (!id) return;
+    switch (action) {
+      case 'addChild': addChildNode(id); break;
+      case 'rename': renameNode(id); break;
+      case 'setRoot': setViewRoot(id); break;
+      case 'delete': deleteNode(id); break;
+    }
+  });
+});
+
+/* ===================== 表单侧边面板（编辑字段） ===================== */
+function renderFormPanel() {
+  const panel = document.getElementById('formPanel');
+  const body = document.getElementById('formPanelBody');
+
+  if (!selectedNodeId) {
+    panel.classList.add('empty');
+    body.innerHTML = `<div class="empty-hint">
+      <div class="icon">⚙️</div>
+      <div>点击树图上的节点<br>进入字段编辑</div>
+      <div class="tip">• 11 种字段类型<br>• 新增「子表」支持可增删行的明细<br>• 数据自动保存</div>
+    </div>`;
+    return;
+  }
+
+  const page = getCurrentPage();
+  const node = findNode(page.root, selectedNodeId);
+  if (!node) { panel.classList.add('empty'); return; }
+  panel.classList.remove('empty');
+
+  const fields = node.form || [];
+  const isRoot = page.root.id === node.id;
+
+  body.innerHTML = `
+    <div class="form-section">
+      <div class="form-section-label">节点信息</div>
+      <input class="node-name-input" type="text" value="${esc(node.text)}" 
+             onchange="updateNodeName('${node.id}', this.value)" placeholder="节点名称">
+    </div>
+    <div class="form-section">
+      <div class="form-section-label">表单字段（${fields.length}）</div>
+      <div class="field-list" id="fieldList">
+        ${fields.map((f, i) => renderFieldItem(f, i)).join('')}
+        ${fields.length === 0 ? `<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">还没有字段，点下方按钮添加</div>` : ''}
+      </div>
+      <button class="add-field-btn" onclick="openFieldModal(-1)">＋ 添加表单字段</button>
+    </div>
+    <div class="form-section">
+      <div class="form-section-label">快捷操作</div>
+      <button class="btn" style="width:100%;margin-bottom:8px" onclick="addChildNode('${node.id}')">＋ 添加子节点</button>
+      ${!isRoot ? `<button class="btn danger" style="width:100%;border-color:var(--danger);color:var(--danger)" onclick="deleteNode('${node.id}')">🗑️ 删除此节点</button>` : ''}
+    </div>
+  `;
+}
+
+function renderFieldItem(field, index) {
+  const typeLabel = { text: '文本', textarea: '多行', number: '数字', date: '日期',
+    select: '下拉', checkbox: '复选', radio: '单选', file: '文件', tel: '电话', email: '邮箱',
+    subform: '子表' }[field.type] || field.type;
+  const req = field.required ? ' *' : '';
+  const cols = (field.columns || []).length;
+  const opts = (field.options || []).length;
+
+  const hasDetail = field.type === 'subform' || ['select','checkbox','radio'].includes(field.type);
+  const expKey = field.id;
+  const isExpanded = expandedFields.has(expKey);
+
+  // 明细内容
+  let detailHtml = '';
+  if (hasDetail) {
+    if (field.type === 'subform') {
+      const colTypeMap = { text: '文本', textarea: '多行', number: '数字', date: '日期', select: '下拉', checkbox: '复选', radio: '单选', file: '文件' };
+      const optsTypes = ['select', 'checkbox', 'radio'];
+      detailHtml = `<div class="field-detail">
+        <div class="fd-row"><span class="fd-label">共 ${cols} 列</span></div>
+        <div class="fd-cols">${(field.columns || []).map(c => {
+          const colOptsHtml = (optsTypes.includes(c.type) && c.options && c.options.length)
+            ? `<div class="fd-col-opts">${c.options.map(o => `<span class="fd-chip">${esc(o)}</span>`).join('')}</div>`
+            : '';
+          return `
+          <div class="fd-col">
+            <span class="col-n">${esc(c.label)}</span>
+            <span class="col-t">${colTypeMap[c.type] || c.type}</span>
+            ${c.required ? '<span class="col-req">* 必填</span>' : ''}
+          </div>
+          ${colOptsHtml}
+        `;
+        }).join('')}</div>
+      </div>`;
+    } else {
+      // select / checkbox / radio
+      const typeLabel2 = field.type==='select'?'下拉选项':field.type==='checkbox'?'复选选项':'单选项';
+      detailHtml = `<div class="field-detail">
+        <div class="fd-row"><span class="fd-label">${typeLabel2}共 ${opts} 个</span></div>
+        <div class="fd-chips">${(field.options || []).map(o => `<span class="fd-chip">${esc(o)}</span>`).join('')}</div>
+      </div>`;
+    }
+  }
+
+  const detailBtn = hasDetail ? `<button class="detail-btn" onclick="toggleFieldDetail('${expKey}')">${isExpanded?'收起明细':'▶ 明细'}</button>` : '';
+
+  return `<div class="field-item ${hasDetail?'has-detail':''} ${isExpanded?'expanded':''}">
+    <span class="field-label">${esc(field.label)}${req}</span>
+    <span class="field-type">${typeLabel}</span>
+    <span class="field-actions">
+      ${detailBtn}
+      <button onclick="moveField(${index},-1)" title="上移">↑</button>
+      <button onclick="moveField(${index},1)" title="下移">↓</button>
+      <button onclick="openFieldModal(${index})" title="编辑">✏️</button>
+      <button class="del" onclick="deleteField(${index},'${expKey}')" title="删除">🗑️</button>
+    </span>
+    ${detailHtml}
+  </div>`;
+}
+
+function toggleFieldDetail(fieldId) {
+  if (expandedFields.has(fieldId)) expandedFields.delete(fieldId);
+  else expandedFields.add(fieldId);
+  renderFormPanel();
+}
+
+function updateNodeName(nodeId, value) {
+  const page = getCurrentPage();
+  const node = findNode(page.root, nodeId);
+  if (node && value.trim()) {
+    node.text = value.trim();
+    save(); renderTree();
+  }
+}
+
+function moveField(index, dir) {
+  const page = getCurrentPage();
+  const node = findNode(page.root, selectedNodeId);
+  if (!node || !node.form) return;
+  const newIdx = index + dir;
+  if (newIdx < 0 || newIdx >= node.form.length) return;
+  [node.form[index], node.form[newIdx]] = [node.form[newIdx], node.form[index]];
+  save(); renderFormPanel();
+}
+
+function deleteField(index, expKey) {
+  const page = getCurrentPage();
+  const node = findNode(page.root, selectedNodeId);
+  if (!node || !node.form) return;
+  node.form.splice(index, 1);
+  if (expKey) expandedFields.delete(expKey);
+  save(); renderFormPanel(); renderTree();
+}
+
+/* ===================== 字段编辑模态框 ===================== */
+let modalSubCols = []; // 暂存子表的列（模态框内）
+const SUB_COL_TYPES = [
+  { v: 'text', l: '文本' },
+  { v: 'number', l: '数字' },
+  { v: 'date', l: '日期' },
+  { v: 'select', l: '下拉' },
+  { v: 'checkbox', l: '复选' },
+  { v: 'radio', l: '单选' },
+  { v: 'textarea', l: '多行' },
+  { v: 'file', l: '文件' },
+];
+
+function openFieldModal(index) {
+  editingFieldIndex = index;
+  const node = findNode(getCurrentPage().root, selectedNodeId);
+  const field = (index >= 0 && node.form[index]) || { label: '', type: 'text', required: false, options: [], columns: [] };
+  document.getElementById('fieldModalTitle').textContent = index >= 0 ? '编辑表单字段' : '添加表单字段';
+  document.getElementById('fieldLabel').value = field.label;
+  document.getElementById('fieldType').value = field.type;
+  document.getElementById('fieldRequired').value = String(field.required);
+  document.getElementById('fieldOptions').value = (field.options || []).join('\n');
+
+  // 子表编辑器
+  modalSubCols = JSON.parse(JSON.stringify(field.columns || []));
+  renderSubCols();
+
+  refreshModalVisibility();
+  document.getElementById('fieldModal').classList.add('show');
+  setTimeout(() => document.getElementById('fieldLabel').focus(), 50);
+}
+
+function refreshModalVisibility() {
+  const type = document.getElementById('fieldType').value;
+  const opt = document.getElementById('optionsEditor');
+  const sub = document.getElementById('subformEditor');
+  opt.style.display = ['select', 'radio', 'checkbox'].includes(type) ? 'block' : 'none';
+  sub.style.display = type === 'subform' ? 'block' : 'none';
+}
+
+document.getElementById('fieldType').addEventListener('change', refreshModalVisibility);
+
+function renderSubCols() {
+  const box = document.getElementById('subCols');
+  if (!box) return;
+  const optsTypes = ['select', 'checkbox', 'radio'];
+  box.innerHTML = modalSubCols.map((c, i) => {
+    const needOpts = optsTypes.includes(c.type);
+    const opts = (c.options || []).join('\n');
+    return `
+    <div class="sub-col-group">
+      <div class="sub-col">
+        <input type="text" placeholder="列名" value="${esc(c.label)}" data-idx="${i}" data-k="label" oninput="updateSubCol(${i},'label',this.value)">
+        <select data-idx="${i}" data-k="type" onchange="updateSubColType(${i},this.value)">
+          ${SUB_COL_TYPES.map(t => `<option value="${t.v}" ${c.type===t.v?'selected':''}>${t.l}</option>`).join('')}
+        </select>
+        <label class="sub-col-req"><input type="checkbox" ${c.required?'checked':''} onchange="updateSubCol(${i},'required',this.checked)"> 必填</label>
+        <button type="button" class="del-col" onclick="deleteSubCol(${i})" title="删除此列">🗑️</button>
+      </div>
+      ${needOpts ? `<div class="sub-col-opts"><textarea data-idx="${i}" placeholder="每行一个选项" oninput="updateSubColOptions(${i},this.value)">${esc(opts)}</textarea></div>` : ''}
+    </div>
+    `;
+  }).join('');
+}
+
+function updateSubColType(i, v) {
+  if (!modalSubCols[i]) return;
+  modalSubCols[i].type = v;
+  // 切换到有 options 的类型时初始化空数组
+  if (['select', 'checkbox', 'radio'].includes(v) && !modalSubCols[i].options) {
+    modalSubCols[i].options = [];
+  }
+  renderSubCols();
+}
+
+function updateSubColOptions(i, text) {
+  if (!modalSubCols[i]) return;
+  modalSubCols[i].options = text.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+function addSubCol() {
+  modalSubCols.push({ id: genId(), label: '', type: 'text', required: false });
+  renderSubCols();
+}
+
+function deleteSubCol(i) {
+  modalSubCols.splice(i, 1);
+  renderSubCols();
+}
+
+function updateSubCol(i, k, v) {
+  if (!modalSubCols[i]) return;
+  modalSubCols[i][k] = v;
+}
+
+function closeFieldModal() {
+  document.getElementById('fieldModal').classList.remove('show');
+  editingFieldIndex = -1;
+  modalSubCols = [];
+}
+
+function saveField() {
+  const label = document.getElementById('fieldLabel').value.trim();
+  if (!label) { alert('请输入字段名称'); return; }
+  const type = document.getElementById('fieldType').value;
+  const required = document.getElementById('fieldRequired').value === 'true';
+  const optionsText = document.getElementById('fieldOptions').value.trim();
+  const options = ['select', 'radio', 'checkbox'].includes(type) ?
+    optionsText.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+  const page = getCurrentPage();
+  const node = findNode(page.root, selectedNodeId);
+  if (!node) return;
+  if (!node.form) node.form = [];
+
+  const field = {
+    id: editingFieldIndex >= 0 ? node.form[editingFieldIndex].id : genId(),
+    label, type, required
+  };
+  if (options.length) field.options = options;
+  if (type === 'subform') {
+    const cols = modalSubCols.filter(c => c.label && c.label.trim()).map(c => {
+      const col = {
+        id: c.id || genId(),
+        label: c.label.trim(),
+        type: c.type || 'text',
+        required: !!c.required
+      };
+      // select/radio/checkbox 列保存 options
+      if (['select', 'checkbox', 'radio'].includes(c.type) && c.options && c.options.length) {
+        col.options = c.options;
+      }
+      return col;
+    });
+    if (cols.length === 0) { alert('子表至少需要 1 个列'); return; }
+    field.columns = cols;
+  }
+
+  if (editingFieldIndex >= 0) {
+    node.form[editingFieldIndex] = field;
+  } else {
+    node.form.push(field);
+  }
+  save(); closeFieldModal(); renderFormPanel(); renderTree();
+  toast(editingFieldIndex >= 0 ? '已更新字段' : '已添加字段');
+}
+
+/* ===================== 表单预览 ===================== */
+function expandForm(nodeId) {
+  const node = findNode(getCurrentPage().root, nodeId);
+  if (!node || !node.form || node.form.length === 0) {
+    toast('该节点暂无表单字段');
+    return;
+  }
+  const fieldHtml = node.form.map(f => {
+    let input = '';
+    switch (f.type) {
+      case 'textarea': input = `<textarea rows="3" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-family:inherit"></textarea>`; break;
+      case 'number': input = `<input type="number" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px">`; break;
+      case 'date': input = `<input type="date" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px">`; break;
+      case 'select': input = `<select style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px">${(f.options||[]).map(o=>`<option>${esc(o)}</option>`).join('')}</select>`; break;
+      case 'checkbox': input = (f.options||[]).map(o=>`<label style="margin-right:12px"><input type="checkbox"> ${esc(o)}</label>`).join(''); break;
+      case 'radio': input = (f.options||[]).map(o=>`<label style="margin-right:12px"><input type="radio" name="p_${f.id}"> ${esc(o)}</label>`).join(''); break;
+      case 'file': input = `<input type="file" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px">`; break;
+      default: input = `<input type="${f.type==='tel'?'tel':f.type==='email'?'email':'text'}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px">`;
+    }
+    return `<div style="margin-bottom:12px"><label style="display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px">${esc(f.label)}${f.required?' *':''}</label>${input}</div>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  modal.innerHTML = `<div class="modal" style="min-width:480px">
+    <h3>📋 ${esc(node.text)} - 表单预览</h3>
+    <div style="max-height:60vh;overflow-y:auto">${fieldHtml}</div>
+    <div class="modal-actions"><button class="btn primary" onclick="this.closest('.modal-overlay').remove()">关闭</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+/* ===================== 表单面板折叠/展开 ===================== */
+function toggleFormPanel() {
+  state.panelCollapsed = !state.panelCollapsed;
+  applyPanelCollapsed();
+  save();
+  requestAnimationFrame(() => {
+    const page = getCurrentPage();
+    if (page) {
+      const rootNode = findNode(page.root, state.viewRootId || page.root.id);
+      if (rootNode) drawConnections(rootNode);
+    }
+  });
+}
+function applyPanelCollapsed() {
+  const panel = document.getElementById('formPanel');
+  const toggle = document.getElementById('panelToggleBtn');
+  const collapsed = !!state.panelCollapsed;
+  panel.classList.toggle('collapsed', collapsed);
+  document.body.classList.toggle('panel-collapsed', collapsed);
+  toggle.innerHTML = collapsed ? '▶' : '◀';
+  toggle.title = collapsed ? '展开表单面板' : '隐藏表单面板';
+}
+
+/* ===================== 新建页面模态框 ===================== */
+function openPageModal() {
+  document.getElementById('pageName').value = '';
+  document.getElementById('rootName').value = '';
+  document.getElementById('pageModal').classList.add('show');
+  setTimeout(() => document.getElementById('pageName').focus(), 50);
+}
+function closePageModal() { document.getElementById('pageModal').classList.remove('show'); }
+
+function saveNewPage() {
+  const name = document.getElementById('pageName').value.trim();
+  const rootName = document.getElementById('rootName').value.trim() || '流程';
+  if (!name) { alert('请输入流程名称'); return; }
+  const page = {
+    id: genId(), name, viewRootId: null,
+    root: { id: genId(), text: rootName, collapsed: false, form: [], children: [] }
+  };
+  state.pages.push(page);
+  state.currentPageId = page.id;
+  state.viewRootId = null;
+  save(); closePageModal(); renderPageList(); renderTree(); renderFormPanel();
+  toast('已创建新页面');
+}
+
+/* ===================== 导入导出 ===================== */
+let importFileData = null;
+function doExport() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `流程结构_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('已导出数据');
+}
+
+function doImport() {
+  document.getElementById('fileImport').click();
+}
+
+document.getElementById('fileImport').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.pages || !Array.isArray(data.pages)) throw new Error('格式无效');
+      importFileData = data;
+      document.getElementById('importInfo').innerHTML = `
+        检测到 <b>${data.pages.length}</b> 个流程页面，共 ${data.pages.reduce((s,p)=>s+countNodes(p.root),0)} 个节点。<br><br>
+        导入后将 <b>覆盖</b> 当前所有数据，且此操作不可撤销。
+      `;
+      document.getElementById('importModal').classList.add('show');
+    } catch(err) { alert('导入失败：' + err.message); }
+  };
+  rd.readAsText(f);
+  e.target.value = '';
+};
+
+function closeImportModal() { document.getElementById('importModal').classList.remove('show'); }
+function confirmImport() {
+  if (importFileData) {
+    state = importFileData;
+    if (!state.currentPageId || !state.pages.find(p => p.id === state.currentPageId)) {
+      state.currentPageId = state.pages[0].id;
+    }
+    if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
+    normalizePages(state.pages);
+    state.viewRootId = null;
+    selectedNodeId = null;
+    save(); renderPageList(); renderTree(); renderFormPanel(); applyPanelCollapsed();
+    toast('导入成功');
+  }
+  closeImportModal();
+  importFileData = null;
+}
+
+/* ===================== 缩放 ===================== */
+function zoomIn() { state.zoom = Math.min(2, state.zoom + 0.15); renderTree(); }
+function zoomOut() { state.zoom = Math.max(0.4, state.zoom - 0.15); renderTree(); }
+function zoomFit() { state.zoom = 1; state.viewRootId = null; renderTree(); resetScroll(); }
+
+function resetScroll() {
+  const wrap = document.getElementById('canvasWrap');
+  wrap.scrollLeft = 0; wrap.scrollTop = 0;
+}
+
+/* ===================== 重置 ===================== */
+function resetCurrentPage() {
+  const page = getCurrentPage();
+  if (!confirm(`确定重置「${page.name}」？所有节点和表单将被清空。`)) return;
+  page.root = { id: genId(), text: page.name, collapsed: false, form: [], children: [] };
+  state.viewRootId = null; selectedNodeId = null;
+  save(); renderTree(); renderFormPanel();
+  toast('已重置');
+}
+
+/* ===================== 事件绑定 ===================== */
+document.getElementById('btnAddPage').onclick = openPageModal;
+document.getElementById('btnImport').onclick = doImport;
+document.getElementById('btnExport').onclick = doExport;
+document.getElementById('btnZoomIn').onclick = zoomIn;
+document.getElementById('btnZoomOut').onclick = zoomOut;
+document.getElementById('btnZoomFit').onclick = zoomFit;
+document.getElementById('btnReset').onclick = resetCurrentPage;
+
+document.getElementById('btnAddRootChild').onclick = () => {
+  const page = getCurrentPage();
+  const rootId = state.viewRootId || page.root.id;
+  addChildNode(rootId);
+};
+
+// 画布滚动时重绘连线
+let scrollTimer = null;
+document.getElementById('canvasWrap').addEventListener('scroll', () => {
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    const page = getCurrentPage();
+    if (page) {
+      const rootNode = findNode(page.root, state.viewRootId || page.root.id);
+      if (rootNode) drawConnections(rootNode);
+    }
+  }, 50);
+});
+
+// 鼠标滚轮缩放（Ctrl + 滚轮）
+document.getElementById('canvasWrap').addEventListener('wheel', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    state.zoom = Math.max(0.4, Math.min(2, state.zoom + delta));
+    renderTree();
+  }
+}, { passive: false });
+
+/* ===================== 辅助 ===================== */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* 旧数据兼容：把原来的 note 字段清掉，统一为 form 数组 */
+function normalizePages(pages) {
+  const walk = (n) => {
+    if (!n) return;
+    if (Array.isArray(n.note)) {
+      // 历史上误用：如果 note 是数组（可能是旧 form 残留），保留它作为 form
+      n.form = n.note; delete n.note;
+    } else if (typeof n.note === 'string' && n.note.trim()) {
+      // 历史上的字符串备注：转换成一个 textarea 表单字段
+      n.form = n.form || [];
+      n.form.push({ id: genId(), label: '备注', type: 'textarea', required: false });
+      delete n.note;
+    } else {
+      if ('note' in n) delete n.note;
+    }
+    if (!Array.isArray(n.form)) n.form = [];
+    (n.children || []).forEach(walk);
+  };
+  (pages || []).forEach(p => walk(p.root));
+}
+
+/* ===================== 启动 ===================== */
+load();
+if (typeof state.panelCollapsed === 'undefined') state.panelCollapsed = false;
+normalizePages(state.pages);
+save();
+renderPageList();
+renderTree();
+renderFormPanel();
+applyPanelCollapsed();
+</script>
+</body>
+</html>

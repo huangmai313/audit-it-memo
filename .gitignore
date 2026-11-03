@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.py
+
+# Temp / cache
+.trae-html-share-packages/
+.trae*
+
+# Bin / office docs (not part of web page)
+*.docx
+日报/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

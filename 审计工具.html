@@ -1,0 +1,2869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>审计工具 · Audit Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  :root{
+    --green:#0b7a3e; --green-dark:#085c2f; --green-bg:#e9f5ee; --green-line:#cde7d8;
+    --ink:#1f2a24; --muted:#6b7a71; --line:#e3eae6; --neg:#c0392b;
+    --paper:#ffffff; --bg:#f4f7f5;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
+  }
+  .layout{display:flex; align-items:flex-start; gap:20px; max-width:1680px; margin:0 auto; padding:20px 24px 60px;}
+  .wrap{flex:1; min-width:0;}
+
+  /* ===== 侧边栏 ===== */
+  .sidebar{
+    width:190px; flex:none; background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:10px 8px; position:sticky; top:20px;
+    box-shadow:0 1px 3px rgba(20,40,30,.05);
+  }
+  .sidebar .side-title{font-size:11px; color:var(--muted); padding:6px 10px 8px; letter-spacing:1px; font-weight:600;}
+  .side-item{
+    display:flex; align-items:center; gap:9px; width:100%; padding:10px 12px; border:none; background:transparent;
+    border-radius:8px; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; font-family:inherit;
+    transition:background .15s;
+  }
+  .side-item:hover{background:var(--green-bg);}
+  .side-item.active{background:var(--green); color:#fff; font-weight:600;}
+  .side-item .ico{width:20px; text-align:center; flex:none;}
+  .side-item.group .arrow{width:14px; flex:none; font-size:10px; color:var(--muted); transition:transform .15s; display:inline-block;}
+  .side-item.group.collapsed .arrow{transform:rotate(-90deg);}
+  .side-item.group.active{background:var(--green-bg); color:var(--ink); font-weight:600;}
+  .side-item.sub{padding-left:38px; font-size:13px;}
+  .side-item.sub2{padding-left:58px; font-size:12.5px;}
+  .side-item.disabled{opacity:.4; cursor:not-allowed;}
+  .side-item.disabled:hover{background:transparent;}
+  .side-children.hidden{display:none;}
+
+  /* ===== 底稿页 ===== */
+  .wp-page{display:none; background:var(--paper); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+    box-shadow:0 1px 4px rgba(20,40,30,.06); margin-top:14px;}
+  .wp-page.active{display:block;}
+  .wp-head{padding:20px 28px 14px; border-bottom:2px solid var(--green-line); position:relative;}
+  .wp-head h2{font-size:20px; font-weight:700;}
+  .wp-head .ref{font-size:12px; color:var(--muted); margin-top:3px;}
+
+
+  /* ===== RMA费用底稿 ===== */
+  .rma-toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 28px; background:#fbfdfb; border-bottom:1px solid var(--line);}
+  .rma-toolbar .sep{width:1px; height:22px; background:var(--line); flex:none;}
+  .rma-search{padding:7px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-family:inherit; width:230px;}
+  .rma-meta{font-size:12.5px; color:var(--muted); padding:12px 28px 0;}
+  .rma-meta b{color:var(--ink); font-weight:600;}
+  .rma-sec{padding:14px 28px 4px; font-size:14.5px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:8px;}
+  .rma-sec .cnt-badge{font-size:11.5px; color:var(--muted); border:1px solid var(--line); border-radius:10px; padding:1px 9px; font-weight:400;}
+  .share-bar{display:flex; align-items:center; gap:8px;}
+  .share-bar .bar{flex:1; height:8px; border-radius:4px; background:#eef3ef; overflow:hidden; min-width:60px;}
+  .share-bar .bar i{display:block; height:100%; border-radius:4px; background:var(--green);}
+  .share-bar .pct{font-size:12px; color:var(--muted); width:52px; text-align:right; flex:none; font-variant-numeric:tabular-nums;}
+  .rma-two{display:grid; grid-template-columns:1fr 1fr; gap:18px; padding:14px 28px;}
+  @media (max-width:1100px){ .rma-two{grid-template-columns:1fr;} }
+  tr.tr-dept{cursor:pointer;}
+  tr.tr-dept:hover td{background:var(--green-bg);}
+  tr.dept-kids.hidden{display:none;}
+  tr.dept-kids td{background:#f7faf7; font-size:12.5px;}
+  tr.month-sum td{background:#eef6f0; font-weight:600; color:var(--green-dark); font-size:12.5px;}
+  .rma-empty{padding:40px 28px; text-align:center; color:var(--muted); font-size:13.5px;}
+
+  /* ===== 控制程序表 ===== */
+  .ctrl-block{padding:6px 14px 8px;}
+  .ctrl-toolbar{display:flex; gap:10px; align-items:center; padding:12px 28px 16px; background:#fbfdfb; border-top:1px solid var(--line);}
+  .ctrl-card{border:1px solid #d6e4f5; border-left:4px solid #2c7be5; border-radius:12px; padding:14px 14px 16px; margin-bottom:14px; background:linear-gradient(to right,#fbfdff 0%,#fff 12%); box-shadow:0 2px 6px rgba(44,123,229,.06); overflow-x:auto;}
+  .ctrl-card.locked{border-color:#e0d6ae; border-left-color:#c9b357; background:#fdfcf6; box-shadow:0 2px 6px rgba(201,179,87,.10);}
+  .ctrl-card.locked .ctrl-no{color:#a5832e;}
+  .ctrl-card.locked .ctrl-table th{background:#faf6e8; color:#7a5f1a; border-bottom-color:#c9b357;}
+  .ctrl-card.locked .ctrl-table td input, .ctrl-card.locked .ctrl-table td select, .ctrl-card.locked .ctrl-table td textarea{background:#f5f4ee; color:#6b6753; cursor:not-allowed;}
+  .ctrl-card.locked .ctrl-name{color:#7a5f1a; cursor:not-allowed;}
+  .ctrl-card.locked .ctrl-del, .ctrl-card.locked .ctrl-row-add, .ctrl-card.locked td.num button{opacity:.45; pointer-events:none;}
+  .ctrl-card-head{display:flex; align-items:center; gap:10px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #e3ecf5;}
+  .ctrl-card.locked .ctrl-card-head{border-bottom-color:#e8e2c8;}
+  .ctrl-card-head span.ctrl-no{font-size:14.5px; font-weight:800; color:#2c7be5; flex:none; letter-spacing:.3px;}
+  .ctrl-card-head input.ctrl-name{flex:1; border:none; border-bottom:1.5px dashed #c8d8ea; padding:3px 6px; font-size:14px; font-weight:600; font-family:inherit; outline:none; background:transparent; min-width:0; color:#1a3d6e;}
+  .ctrl-card-head input.ctrl-name:focus{border-bottom-color:#2c7be5; border-style:solid;}
+  .ctrl-card-head button.ctrl-del{border:1px solid #f0c9c3; background:#fff; color:#c0392b; cursor:pointer; font-size:12.5px; padding:4px 11px; border-radius:6px; font-family:inherit; white-space:nowrap;}
+  .ctrl-card-head button.ctrl-del:hover{background:#fdecea;}
+  .ctrl-card-head button.ctrl-lock{border:1px solid var(--line); background:#fff; color:var(--muted); cursor:pointer; font-size:12.5px; padding:4px 11px; border-radius:6px; font-family:inherit; white-space:nowrap;}
+  .ctrl-card-head button.ctrl-lock:hover{border-color:var(--green); color:var(--green-dark); background:var(--green-bg);}
+  .ctrl-card-head button.ctrl-lock.on{background:#fdf8ec; border-color:#e2b13c; color:#a5731a; font-weight:600;}
+  .ctrl-card-head button.ctrl-lock.on:hover{background:#fbf1d9; border-color:#d3a022; color:#8d6212;}
+  table.ctrl-table{width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:14px; background:#fff; border-radius:8px; table-layout:auto;}
+  table.ctrl-table th{background:linear-gradient(180deg,#eef5fb,#e2edf7); text-align:left; padding:9px 12px; border-bottom:2px solid #2c7be5; color:#1a3d6e; font-size:13px; font-weight:700; letter-spacing:.5px;}
+  table.ctrl-table td{padding:8px 12px; border-bottom:1px solid #eef2f7; border-right:1px solid #eef2f7; vertical-align:top; min-width:280px;}
+  table.ctrl-table tr td:last-child{border-right:none;}
+  /* 转置表：左侧字段名列 */
+  table.ctrl-table-v th.ctrl-rowh{width:110px; background:linear-gradient(180deg,#eef5fb,#e2edf7); border-right:2px solid #2c7be5; border-bottom:1px solid #e2edf7; color:#1a3d6e; font-size:13.5px; font-weight:700; letter-spacing:.5px; vertical-align:middle; text-align:left; padding:10px 12px;}
+  table.ctrl-table-v th.ctrl-rowh-op{width:110px; background:#f8fbfe; border-right:2px solid #2c7be5; border-bottom:none;}
+  table.ctrl-table-v tr:last-child td{border-bottom:none;}
+  table.ctrl-table-v tr:last-child th{border-bottom:none;}
+  /* 成文制度表头行（跨所有列合并） */
+  table.ctrl-table-v tr.ctrl-policy-row td.ctrl-policy-cell{min-width:0; background:#fbfdff;}
+  table.ctrl-table-v tr.ctrl-policy-row td.ctrl-policy-cell textarea{min-height:64px;}
+  table.ctrl-table td textarea{width:100%; box-sizing:border-box; border:1.5px dashed transparent; border-radius:6px; padding:10px 12px; font-size:15px; font-family:inherit; line-height:1.75; background:transparent; outline:none; color:var(--ink); resize:vertical; min-height:96px; white-space:pre-wrap; word-break:break-word;}
+  table.ctrl-table tbody tr:hover td{background:#f8fbfe;}
+  table.ctrl-table tbody tr:last-child td{border-bottom:none;}
+  table.ctrl-table td input, table.ctrl-table td select{width:100%; border:1.5px dashed transparent; border-radius:6px; padding:7px 10px; font-size:15px; font-family:inherit; background:transparent; outline:none; color:var(--ink);}
+  table.ctrl-table td select{cursor:pointer; font-weight:600; color:#1a3d6e;}
+  table.ctrl-table td select:disabled{cursor:not-allowed; color:#6b6753;}
+  table.ctrl-table td input:hover, table.ctrl-table td select:hover, table.ctrl-table td textarea:hover{border-color:#c8d8ea;}
+  table.ctrl-table td input:focus, table.ctrl-table td select:focus, table.ctrl-table td textarea:focus{border-color:#2c7be5; border-style:solid; background:#fff; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  table.ctrl-table td.num{text-align:center; width:44px;}
+  table.ctrl-table td.num button{background:none; border:none; color:#c0392b; cursor:pointer; font-size:15px; padding:0 5px; border-radius:4px;}
+  table.ctrl-table td.num button:hover{color:#8e1a1a; background:#fdecea;}
+  .ctrl-row-add{padding:8px 0 2px;}
+  .ctrl-empty{padding:10px 28px; text-align:center; color:var(--muted); font-size:13px;}
+
+  /* ===== 审计结论 ===== */
+  .conclusion-block{margin:22px 28px 0; padding:0 0 16px;}
+  .conclusion-head{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .conclusion-head h3{margin:0; font-size:16px; color:#1a3d6e;}
+  .conclusion-head .spacer{flex:1;}
+  .conclusion-mod{margin-bottom:16px;}
+  .conclusion-mod h4{margin:0 0 7px; font-size:13.5px; color:#1a3d6e; font-weight:600;}
+  .conclusion-mod h4 .mod-no{display:inline-block; min-width:20px; height:20px; line-height:20px; text-align:center;
+    background:#eef5fb; color:#1a3d6e; border-radius:5px; font-size:12px; margin-right:7px;}
+  .conclusion-mod textarea{width:100%; box-sizing:border-box; min-height:76px; resize:vertical; font-family:inherit;
+    font-size:13.5px; line-height:1.7; padding:9px 12px; border:1px solid var(--line); border-radius:7px;
+    background:#fff; color:var(--ink); outline:none;}
+  .conclusion-mod textarea:focus{border-color:#2c7be5; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  .concl-sub{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; background:#fbfdfb;}
+  .concl-sub-head{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .concl-sub-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .concl-sub-head .spacer{flex:1;}
+  .concl-sub-head button{font-size:12px; padding:3px 10px;}
+  .concl-item{display:flex; gap:8px; align-items:flex-start; margin-bottom:8px;}
+  .concl-item textarea{min-height:44px; flex:1;}
+  .concl-item button{flex:none; border:1px solid var(--line); background:#fff; color:#c0392b; cursor:pointer;
+    border-radius:6px; padding:4px 9px; font-size:13px;}
+  .concl-item button:hover{background:#fdecea; border-color:#f5c6c0;}
+  .concl-sign{display:flex; align-items:center; gap:12px; margin-top:18px; padding:14px 16px;
+    border:1px dashed #c9d8d0; border-radius:8px; background:#fbfdfb;}
+  .concl-sign label{font-size:13.5px; color:#1a3d6e; font-weight:600; white-space:nowrap;}
+  .concl-sign input{flex:1; max-width:320px; font-family:inherit; font-size:13.5px; padding:7px 10px;
+    border:1px solid var(--line); border-radius:6px; background:#fff; outline:none;}
+  .concl-sign input:focus{border-color:#2c7be5; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  .concl-note{margin-top:9px; font-size:12px; color:var(--muted);}
+
+  /* ===== 底稿二级页签 ===== */
+  .wp-tabs{display:flex; gap:8px; padding:12px 28px 0; background:#fbfdfb; border-bottom:1px solid var(--line);}
+  .wp-tab{border:1px solid transparent; border-bottom:none; background:transparent; color:var(--muted); cursor:pointer;
+    padding:9px 18px; font-size:14px; font-family:inherit; font-weight:600; border-radius:8px 8px 0 0; position:relative; top:1px;}
+  .wp-tab:hover{color:var(--green-dark);}
+  .wp-tab.active{background:#fff; color:#1a3d6e; border-color:var(--line); box-shadow:inset 0 3px 0 #2c7be5;}
+
+  /* ===== 比率分析：同比 ===== */
+  .ratio-block{padding:18px 28px 26px;}
+  .ratio-bar{display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:14px;}
+  .ratio-field{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);}
+  .ratio-field select{font-family:inherit; font-size:13.5px; padding:6px 10px; border:1px solid var(--line);
+    border-radius:7px; background:#fff; color:var(--ink); outline:none;}
+  .ratio-field select:focus{border-color:#2c7be5; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  .ratio-scroll{overflow:auto; max-height:62vh; border:1px solid var(--line); border-radius:8px; background:#fff;}
+  table.ratio-table{width:100%; min-width:900px; border-collapse:collapse; border:none; border-radius:0; font-size:13.5px;}
+  table.ratio-table thead th{position:sticky; top:0; z-index:2; background:#f7faf8; color:var(--muted);
+    font-weight:600; text-align:left; border-bottom:1px solid var(--line); padding:9px 12px; white-space:nowrap;}
+  table.ratio-table thead th.num{text-align:right;}
+  table.ratio-table td{border-bottom:1px solid #edf1ee; border-right:none; padding:9px 12px; vertical-align:middle;}
+  table.ratio-table tbody tr:hover td{background:#fafcfb;}
+  table.ratio-table td.code{font-family:Consolas,"SF Mono",monospace; color:var(--muted); white-space:nowrap;}
+  table.ratio-table td.num{text-align:right; white-space:nowrap;}
+  .ratio-en{color:var(--ink);}
+  .ratio-cn{font-size:12px; color:var(--muted); margin-top:2px;}
+  table.ratio-table td.num.up{color:#1d7a3c;}
+  table.ratio-table td.num.down{color:var(--neg);}
+  .ratio-note{margin-top:10px; font-size:12px; color:var(--muted); line-height:1.7;}
+  .ratio-section h3{margin:0 0 10px; font-size:14px; color:#1a3d6e; font-weight:600;}
+  .ratio-section{margin-top:18px;}
+  table.ratio-table tr.ratio-total td{background:#f7faf8; font-weight:700; border-top:2px solid #dfe8e3;}
+  .match-card{border:1px solid var(--line); background:#fbfdfb; border-radius:10px; padding:14px 18px; margin-bottom:6px;}
+  .match-card.warn{background:#fdf8ec; border-color:#e2b13c;}
+  .match-head{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+  .match-head h3{margin:0; font-size:14px; color:#1a3d6e; font-weight:600;}
+  .match-grid{display:flex; flex-wrap:wrap; gap:32px;}
+  .match-cell .lbl{font-size:12px; color:var(--muted); margin-bottom:3px;}
+  .match-cell .val{font-size:17px; font-weight:700; color:var(--ink);}
+  .match-cell .val.up{color:#1d7a3c;}
+  .match-cell .val.down{color:var(--neg);}
+  .match-note{margin:10px 0 0; font-size:12px; color:var(--muted); line-height:1.7;}
+
+  /* ===== 抽凭表 ===== */
+  .voucher-block{padding:18px 28px 26px;}
+  .voucher-title{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .voucher-title h3{font-size:15.5px; font-weight:700; color:var(--ink); flex:none;}
+  .voucher-title input{flex:1; max-width:360px; box-sizing:border-box; padding:7px 10px; border:1px solid var(--line);
+    border-radius:8px; font-size:14px; font-family:inherit; color:var(--ink); background:#fff; outline:none;}
+  .voucher-title input:focus{border-color:#2c7be5; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  .voucher-lock{margin-left:auto; flex:none; border:1px solid var(--line); background:#fff; color:var(--muted); cursor:pointer;
+    font-size:12.5px; font-family:inherit; padding:5px 12px; border-radius:6px; white-space:nowrap;}
+  .voucher-lock:hover{border-color:var(--green); color:var(--green-dark); background:var(--green-bg);}
+  .voucher-lock.on{background:#fdf8ec; border-color:#e2b13c; color:#a5731a; font-weight:600;}
+  .voucher-lock.on:hover{background:#fbf1d9; border-color:#d3a022; color:#8d6212;}
+  table.voucher-table textarea:disabled, table.voucher-table input:disabled{background:#f5f4ee; color:#6b6753; cursor:not-allowed;}
+  table.voucher-table textarea:disabled:hover, table.voucher-table input:disabled:hover{border-color:transparent;}
+  .voucher-table-wrap{overflow:auto; max-height:62vh; border:1px solid var(--line); border-radius:8px; background:#fff;}
+  table.voucher-table{width:100%; min-width:1300px; border-collapse:collapse; background:#fff; border:none; border-radius:0; font-size:14px; table-layout:fixed;}
+  table.voucher-table thead th{position:sticky; top:0; z-index:2;}
+  table.voucher-table th{background:linear-gradient(180deg,#eef5fb,#e2edf7); color:#1a3d6e; font-size:13px; font-weight:700;
+    padding:9px 10px; border-bottom:2px solid #2c7be5; text-align:left; white-space:normal; line-height:1.35; word-break:normal; overflow-wrap:anywhere;}
+  table.voucher-table td{padding:5px 8px; border-bottom:1px solid #eef2f7; border-right:1px solid #eef2f7; vertical-align:middle;}
+  table.voucher-table td:last-child{border-right:none;}
+  table.voucher-table tbody tr:hover td{background:#f8fbfe;}
+  table.voucher-table input, table.voucher-table select, table.voucher-table textarea{width:100%; box-sizing:border-box; border:1.5px dashed transparent;
+    border-radius:6px; padding:7px 8px; font-size:14px; font-family:inherit; background:transparent; outline:none; color:var(--ink);}
+  table.voucher-table textarea{display:block; resize:none; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.5;}
+  table.voucher-table input:hover, table.voucher-table select:hover, table.voucher-table textarea:hover{border-color:#c8d8ea;}
+  table.voucher-table input:focus, table.voucher-table select:focus, table.voucher-table textarea:focus{border-color:#2c7be5; border-style:solid; background:#fff; box-shadow:0 0 0 3px rgba(44,123,229,.12);}
+  table.voucher-table td.vnum{vertical-align:top; padding-top:8px; text-align:right; font-variant-numeric:tabular-nums;}
+  table.voucher-table td.vdel{vertical-align:top; padding-top:7px; text-align:center; width:40px;}
+  table.voucher-table td.vdel button{background:none; border:none; color:#c0392b; cursor:pointer; font-size:15px; padding:0 5px; border-radius:4px;}
+  table.voucher-table td.vdel button:hover{background:#fdecea;}
+  table.voucher-table .voucher-empty{text-align:center; color:var(--muted); font-size:13px; padding:22px 10px;}
+  .voucher-add{padding-top:10px;}
+
+  /* ===== 业务类别发生额（横向柱状图） ===== */
+  .chart-card{margin-top:20px; border:1px solid var(--line); border-radius:10px; background:#fff; padding:16px 18px; box-shadow:0 1px 3px rgba(20,40,30,.05);}
+  .chart-card h3{font-size:15px; font-weight:700; color:var(--ink); margin-bottom:14px; padding-bottom:8px; border-bottom:2px solid var(--green-line);}
+  .hbar-chart{display:flex; flex-direction:column; gap:10px; padding:4px 2px;}
+  .hbar-row{display:grid; grid-template-columns:150px 1fr 120px 60px; align-items:center; gap:12px; font-size:13px;}
+  .hbar-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink);}
+  .hbar-track{height:20px; background:#eef3f8; border-radius:5px; overflow:hidden;}
+  .hbar-fill{height:100%; border-radius:5px; transition:width .25s ease;}
+  .hbar-val{text-align:right; font-variant-numeric:tabular-nums; color:var(--ink);}
+  .hbar-pct{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .hbar-empty{padding:26px; text-align:center; color:var(--muted); font-size:13px;}
+  @media(max-width:720px){ .hbar-row{grid-template-columns:96px 1fr 92px 50px; gap:8px;} }
+
+
+
+  /* ===== 顶部品牌栏 ===== */
+  .brandbar{display:flex; align-items:center; gap:14px; padding:14px 0 18px;}
+  .brand-mark{
+    width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,var(--green),var(--green-dark));
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;
+    box-shadow:0 2px 8px rgba(11,122,62,.25); flex:none;
+  }
+  .brand-text h1{font-size:19px; font-weight:700; letter-spacing:.3px;}
+  .brand-text p{font-size:12px; color:var(--muted);}
+
+  /* ===== 期间管理栏 ===== */
+  .manager{
+    background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:12px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+    box-shadow:0 1px 3px rgba(20,40,30,.05);
+  }
+  .tabs{display:flex; flex-wrap:wrap; gap:8px; align-items:center; flex:1; min-width:200px;}
+  .tab{
+    display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px;
+    border:1px solid var(--line); background:#fafcfa; cursor:pointer; font-size:13px; color:var(--ink);
+    transition:all .15s ease; user-select:none;
+  }
+  .tab:hover{border-color:var(--green); color:var(--green);}
+  .tab.active{background:var(--green); border-color:var(--green); color:#fff; font-weight:600;
+    box-shadow:0 2px 6px rgba(11,122,62,.3);}
+  .tab .del{
+    display:none; width:16px; height:16px; border-radius:50%; background:rgba(255,255,255,.28);
+    color:#fff; font-size:11px; line-height:16px; text-align:center;
+  }
+  .tab.active .del{display:inline-block;}
+  .tab .del:hover{background:#c0392b;}
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; border:1px solid var(--green);
+    background:var(--green); color:#fff; font-size:13px; cursor:pointer; transition:all .15s ease; white-space:nowrap;
+  }
+  .btn:hover{background:var(--green-dark); border-color:var(--green-dark);}
+  .btn.ghost{background:#fff; color:var(--green);}
+  .btn.ghost:hover{background:var(--green-bg);}
+  .btn.danger{background:#fff; color:#c0392b; border-color:#c0392b;}
+  .btn.danger:hover{background:#c0392b; color:#fff;}
+  .toolbar{
+    margin-top:12px; background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:10px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:14px;
+  }
+  .toolbar label.chk{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); cursor:pointer;}
+  .toolbar input[type=checkbox]{accent-color:var(--green); width:15px; height:15px;}
+  .search{
+    flex:1; min-width:180px; max-width:340px; padding:8px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; outline:none; transition:border .15s;
+  }
+  .search:focus{border-color:var(--green); box-shadow:0 0 0 3px rgba(11,122,62,.12);}
+  .spacer{flex:1;}
+
+  /* ===== 报表头 ===== */
+  .stmt{background:var(--paper); border:1px solid var(--line); border-radius:12px; margin-top:14px; overflow:hidden;
+    box-shadow:0 1px 4px rgba(20,40,30,.06);}
+  .stmt-head{padding:22px 28px 14px; text-align:center; border-bottom:2px solid var(--green-line); position:relative;}
+  .stmt-head .company{font-size:15px; font-weight:600; color:var(--muted); letter-spacing:.4px;}
+  .stmt-head h2{font-size:24px; font-weight:700; margin:4px 0 2px;}
+  .stmt-head .cn-title{font-size:15px; color:var(--green); font-weight:600;}
+  .stmt-head .meta{margin-top:6px; font-size:13px; color:var(--muted); display:flex; justify-content:center; gap:22px; flex-wrap:wrap;}
+  .badge{
+    position:absolute; right:22px; top:20px; font-size:12px; padding:5px 11px; border-radius:999px; font-weight:600;
+  }
+  .badge.ok{background:var(--green-bg); color:var(--green); border:1px solid var(--green-line);}
+  .badge.warn{background:#fdf0ee; color:var(--neg); border:1px solid #f2c9c2;}
+  .badge small{font-weight:400;}
+
+  /* ===== 表格 ===== */
+  .tbl-scroll{overflow-x:auto;}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  thead th{
+    position:sticky; top:0; background:#f7faf8; z-index:2; text-align:left; padding:10px 14px;
+    border-bottom:2px solid var(--green); color:var(--green-dark); font-size:12.5px; letter-spacing:.5px; white-space:nowrap;
+  }
+  thead th.num, td.num{text-align:right;}
+  tbody td{padding:6px 14px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tbody tr:hover{background:#f6faf7;}
+  td.code{color:var(--muted); font-family:Consolas,"SF Mono",monospace; font-size:12.5px; white-space:nowrap;}
+  td.name{min-width:280px;}
+  td.num{font-family:Consolas,"SF Mono",monospace; font-variant-numeric:tabular-nums; white-space:nowrap; font-size:13px;}
+  td.num.neg{color:var(--neg);}
+  td.cn{color:#44554b; min-width:200px;}
+  td.cn.editable{cursor:text;}
+  td.cn.editable:hover{background:#f2f8f4; outline:1px dashed var(--green-line); outline-offset:-2px;}
+  td.cn .placeholder{color:#b9c6bf; font-size:12px;}
+  td.cn input{
+    width:100%; border:1px solid var(--green); border-radius:6px; padding:4px 8px; font-size:13px; outline:none;
+    font-family:inherit; background:#fff;
+  }
+  .hint-bar{padding:8px 28px; font-size:12px; color:var(--muted); background:#fbfdfb; border-top:1px solid var(--line);}
+
+  /* 层级样式 */
+  tr.lv0 td.name{font-weight:700; font-size:14.5px; letter-spacing:.5px;}
+  tr.lv0.sec td{background:var(--green); color:#fff; border-bottom:none; padding-top:9px; padding-bottom:9px;}
+  tr.lv0.sec td.code{color:rgba(255,255,255,.7);}
+  tr.lv1 td.name{font-weight:700;}
+  tr.lv1 td{background:#f2f7f4;}
+  tr.lv2 td.name{font-weight:600;}
+  tr.lv3 td.name{font-weight:600; color:#31463a;}
+  tr.lv4 td.name{color:#3c4a42;}
+  .indent-0{padding-left:14px;} .indent-1{padding-left:32px;} .indent-2{padding-left:50px;}
+  .indent-3{padding-left:70px;} .indent-4{padding-left:92px;}
+
+  tr.total td{font-weight:700; border-top:1px solid #9fb8aa; background:#f7fbf8;}
+  tr.grand-total td{font-weight:800; border-top:3px double var(--green-dark); background:var(--green-bg); font-size:14px;}
+  tr.grand-total td.num{font-size:14px;}
+  tr.collapsed-parent{cursor:pointer;}
+  tr.collapsed-parent:hover td{background:#eef5f0;}
+  tr.collapsed-parent .toggle-arrow{display:inline-block; margin-right:6px; transition:transform .15s; font-size:11px; color:var(--green-dark);}
+  tr.collapsed-parent.collapsed .toggle-arrow{transform:rotate(-90deg);}
+  tr.collapsed-child{display:none;}
+  tr.pl-group-header td{background:#f2f7f4; font-weight:700; border-top:1px solid #9fb8aa;}
+  .pct-col{width:100px; text-align:right; font-family:Consolas,monospace; font-variant-numeric:tabular-nums; color:var(--muted);}
+
+  /* 空状态 */
+  .empty{padding:60px 20px; text-align:center; color:var(--muted);}
+  .empty .big{font-size:40px; margin-bottom:10px;}
+
+  footer{margin-top:18px; text-align:center; font-size:12px; color:var(--muted);}
+
+  /* ===== 余额表验证弹窗 ===== */
+  .modal-overlay{position:fixed; inset:0; background:rgba(20,35,28,.45); z-index:50; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .modal{background:#fff; border-radius:14px; max-width:1080px; width:100%; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.25); overflow:hidden;}
+  .modal-head{display:flex; justify-content:space-between; align-items:flex-start; padding:16px 22px; border-bottom:1px solid var(--line);}
+  .modal-head h3{font-size:17px;}
+  .modal-head p{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .modal-body{padding:16px 22px; overflow-y:auto;}
+  .modal-foot{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 22px; border-top:1px solid var(--line); background:#fbfdfb;}
+  .modal-foot label.chk{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); cursor:pointer;}
+  .modal-foot input[type=checkbox]{accent-color:var(--green);}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  .chip{padding:5px 12px; border-radius:999px; font-size:12.5px; font-weight:600; border:1px solid var(--line); background:#f7faf8;}
+  .chip.ok{background:var(--green-bg); color:var(--green); border-color:var(--green-line);}
+  .chip.warn{background:#fdf0ee; color:var(--neg); border-color:#f2c9c2;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap;}
+  .pill.ok{background:var(--green-bg); color:var(--green);}
+  .pill.diff{background:#fdf0ee; color:var(--neg);}
+  .pill.gray{background:#eef1ef; color:var(--muted);}
+  .warnbox{border:1px solid #f2c9c2; background:#fdf6f5; border-radius:10px; padding:12px 16px; margin-bottom:14px;}
+  .warnbox h4{color:var(--neg); font-size:13.5px; margin-bottom:8px;}
+  .vtbl td, .vtbl th{padding:6px 10px;}
+  tr.row-diff td{background:#fdf6f5;}
+
+  /* BS/PL 切换条 */
+  .stmt-tabs{display:flex; gap:0; margin-bottom:0; border-bottom:2px solid var(--green-line);}
+  .stmt-tab{padding:8px 24px; border:none; border-bottom:3px solid transparent; background:transparent;
+    font-size:14px; color:var(--muted); cursor:pointer; font-family:inherit; transition:all .15s; margin-bottom:-2px;}
+  .stmt-tab:hover{color:var(--green-dark); background:var(--green-bg);}
+  .stmt-tab.active{color:var(--green-dark); border-bottom-color:var(--green); font-weight:700;}
+  .stmt-tab.disabled{opacity:.4; cursor:not-allowed;}
+  .stmt-tab.disabled:hover{background:transparent; color:var(--muted);}
+
+  /* ===== 币种汇总 ===== */
+  .cur-section{margin-bottom:20px;}
+  .cur-section h4{font-size:14px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;}
+  .cur-badge{display:inline-block; padding:3px 10px; border-radius:6px; font-size:12px; font-weight:700; letter-spacing:.5px;}
+  .cur-IDR{background:#e8f5e9; color:#1b7a3e;}
+  .cur-CNY{background:#fce8e6; color:#c0392b;}
+  .cur-USD{background:#e3edf7; color:#1a5276;}
+  .cur-OTHER{background:#eef1ef; color:#6b7a71;}
+  .bar-row{display:flex; align-items:center; gap:10px; margin:6px 0; font-size:13px;}
+  .bar-label{width:60px; text-align:right; font-weight:600; flex:none;}
+  .bar-track{flex:1; height:24px; background:#f0f4f2; border-radius:6px; overflow:hidden; position:relative;}
+  .bar-fill{height:100%; border-radius:6px; transition:width .3s ease; display:flex; align-items:center; padding-left:8px; color:#fff; font-size:12px; font-weight:600; white-space:nowrap;}
+  .bar-fill.IDR{background:linear-gradient(90deg,#0b7a3e,#1b9e54);}
+  .bar-fill.CNY{background:linear-gradient(90deg,#c0392b,#e74c3c);}
+  .bar-fill.USD{background:linear-gradient(90deg,#1a5276,#2980b9);}
+  .bar-fill.OTHER{background:linear-gradient(90deg,#6b7a71,#95a5a6);}
+  .bar-amount{width:180px; text-align:right; font-family:Consolas,monospace; font-variant-numeric:tabular-nums; flex:none;}
+  .bar-pct{width:60px; font-size:12px; color:var(--muted); flex:none;}
+  .cur-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px;}
+  .cur-table th{text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); color:var(--green-dark); font-size:12px;}
+  .cur-table td{padding:5px 10px; border-bottom:1px solid var(--line);}
+  .cur-table td.num{font-family:Consolas,monospace; text-align:right; font-variant-numeric:tabular-nums;}
+  .cur-inferred{font-size:11px; color:var(--muted); background:#f7faf8; padding:1px 6px; border-radius:4px; margin-left:4px;}
+
+
+  /* ===== 应用级功能切换（G Logo） ===== */
+  .brand-mark{cursor:pointer; transition:transform .15s, box-shadow .15s; user-select:none;}
+  .brand-mark:hover{transform:scale(1.06); box-shadow:0 4px 14px rgba(11,122,62,.38);}
+  .brand-mark:active{transform:scale(.96);}
+  .brand-hint{font-size:11.5px; color:var(--muted); border:1px solid var(--line); border-radius:999px;
+    padding:3px 10px; background:#fafcfa; white-space:nowrap; margin-left:auto;}
+  .app-view{display:none;}
+  .app-view.active{display:block;}
+  .layout.report-mode{max-width:920px;}
+  .layout.report-mode .sidebar{display:none;}
+
+  /* ===== 工作日报 ===== */
+  #appReport{background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:26px 30px 30px; box-shadow:0 1px 4px rgba(20,40,30,.06);}
+  #appReport .date-row{display:flex; align-items:center; gap:10px; margin-bottom:20px;}
+  #appReport .date-row label{font-weight:600; font-size:14px;}
+  #appReport .date-row input{padding:7px 10px; border:1px solid var(--line); border-radius:8px;
+    font-size:14px; font-family:inherit; color:var(--ink);}
+  #appReport .date-row input:focus{outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgba(11,122,62,.12);}
+  #appReport .section{margin-bottom:20px; border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; background:#fbfdfb;}
+  #appReport .section h2{font-size:16px; font-weight:700; color:var(--ink); margin-bottom:12px;
+    padding-bottom:8px; border-bottom:2px solid var(--green-line);}
+  #appReport .item{display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;}
+  #appReport .item .num{flex:none; width:38px; padding-top:9px; font-weight:600; color:var(--green);
+    font-size:14px; text-align:right;}
+  #appReport .item .content{flex:1; min-width:0; display:flex; flex-direction:column; gap:8px;}
+  #appReport .item textarea{width:100%; min-height:60px; padding:9px 12px; border:1px solid var(--line);
+    border-radius:8px; font-size:15px; font-family:"Microsoft YaHei",inherit; resize:vertical;
+    line-height:1.75; color:var(--ink); background:#fff; outline:none;}
+  #appReport .item textarea:focus{border-color:var(--green); box-shadow:0 0 0 3px rgba(11,122,62,.12);}
+  #appReport .img-list{display:flex; flex-direction:column; gap:10px;}
+  #appReport .img-wrap{display:flex; flex-direction:column; align-items:flex-start; gap:4px;}
+  #appReport .img-preview{max-width:100%; max-height:200px; border-radius:6px; border:1px solid var(--line); display:block;}
+  #appReport .img-actions{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  #appReport .img-actions label{font-size:13px; color:var(--green); cursor:pointer;}
+  #appReport .img-actions label:hover{text-decoration:underline;}
+  #appReport .img-actions input[type=file]{display:none;}
+  #appReport .paste-btn{background:none; border:none; color:var(--green); cursor:pointer; font-size:13px;
+    padding:0; font-family:inherit;}
+  #appReport .paste-btn:hover{text-decoration:underline;}
+  #appReport .remove-img{background:none; border:none; color:var(--neg); cursor:pointer; font-size:13px; padding:0;}
+  #appReport .item .del-btn{flex:none; background:#fff1f0; color:var(--neg); border:1px solid #ffa39e;
+    border-radius:6px; width:30px; height:30px; cursor:pointer; font-size:16px; margin-top:6px;
+    display:flex; align-items:center; justify-content:center;}
+  #appReport .item .del-btn:hover{background:#ffccc7;}
+  #appReport .add-btn{background:var(--green-bg); color:var(--green); border:1px dashed var(--green-line);
+    border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13.5px; width:100%; margin-top:4px;
+    font-family:inherit;}
+  #appReport .add-btn:hover{background:#d8ecdf;}
+  #appReport .actions{display:flex; gap:12px; margin-top:24px; justify-content:center; flex-wrap:wrap;}
+  #appReport .export-btn{background:var(--green); color:#fff; border:none; border-radius:8px;
+    padding:11px 32px; font-size:14.5px; cursor:pointer; font-weight:600; font-family:inherit;}
+  #appReport .export-btn:hover{background:var(--green-dark);}
+  #appReport .export-btn:disabled{background:#bbb; cursor:not-allowed;}
+  #appReport .clear-btn{background:#fff; color:var(--muted); border:1px solid var(--line); border-radius:8px;
+    padding:11px 24px; font-size:14.5px; cursor:pointer; font-family:inherit;}
+  #appReport .clear-btn:hover{background:#f5f5f5;}
+  #appReport .status{text-align:center; margin-top:12px; font-size:13px; color:var(--green); min-height:20px;}
+
+  @media print{
+    body{background:#fff;}
+    .manager,.toolbar,.hint-bar,footer,.del{display:none !important;}
+    .stmt{border:none; box-shadow:none; margin-top:0;}
+    .badge{position:static; display:inline-block; margin-top:6px;}
+    thead th{position:static;}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 侧边栏导航 -->
+  <nav class="sidebar">
+    <div class="side-title">导航 NAVIGATION</div>
+    <button class="side-item group" data-group="stmt"><span class="arrow">▼</span><span class="ico">📊</span>报表查看</button>
+    <div class="side-children" id="grp-stmt">
+      <button class="side-item sub active" data-page="stmt:bs">资产负债表 (BS)</button>
+      <button class="side-item sub" data-page="stmt:pl" id="navPL">利润表 (PL)</button>
+    </div>
+    <button class="side-item" data-page="wpRma"><span class="ico">🧾</span>RMA费用底稿</button>
+    <button class="side-item" data-page="wpRepair"><span class="ico">🔧</span>维修费底稿</button>
+    <button class="side-item" data-page="wpWarranty"><span class="ico">🛡️</span>保修费底稿</button>
+    <button class="side-item" data-page="wpSpare"><span class="ico">⚙️</span>备件费底稿</button>
+    <button class="side-item" data-page="wpInstall"><span class="ico">🎁</span>安装奖励底稿</button>
+    <button class="side-item" data-page="wpTraining"><span class="ico">🎓</span>培训费底稿</button>
+    <button class="side-item" data-page="wpIncentive"><span class="ico">💰</span>销售激励底稿</button>
+    <button class="side-item" data-page="wpVehicleRepair"><span class="ico">🚗</span>车辆维修费底稿</button>
+  </nav>
+
+  <div class="wrap">
+
+  <div class="brandbar">
+    <div class="brand-mark" id="brandMark" title="点击切换到：工作日报工具">G</div>
+    <div class="brand-text">
+      <h1 id="brandTitle">审计工具</h1>
+      <p id="brandSub">Audit Tool · 支持多期间报表导入 / 切换 / 中英科目对照</p>
+    </div>
+    <span class="brand-hint">点击 G 切换功能</span>
+  </div>
+
+  <div class="app-view active" id="appFin">
+  <!-- 期间管理 -->
+  <div class="manager">
+    <div class="tabs" id="tabs"></div>
+    <button class="btn" id="btnImport">＋ 导入报表 (Excel)</button>
+    <button class="btn ghost" id="btnBackup" title="将全部期间数据导出为 JSON 文件备份">备份数据</button>
+    <button class="btn ghost" id="btnRestore" title="从 JSON 备份文件恢复数据">恢复数据</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display:none">
+    <input type="file" id="restoreInput" accept=".json" style="display:none">
+  </div>
+
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="搜索科目编码 / 英文名称 / 中文名称…">
+    <label class="chk"><input type="checkbox" id="hideZero"> 隐藏零余额科目</label>
+    <div class="spacer"></div>
+    <button class="btn" id="btnVerify">✓ 余额表验证</button>
+    <input type="file" id="tbInput" accept=".xlsx,.xls" style="display:none">
+    <button class="btn ghost" id="btnPrint">🖨 打印</button>
+  </div>
+
+  <!-- 报表主体 -->
+  <div class="stmt" id="stmt"></div>
+
+  <!-- 费用类底稿（问题页） -->
+  <div class="wp-page" id="wpRma"></div>
+  <div class="wp-page" id="wpRepair"></div>
+  <div class="wp-page" id="wpWarranty"></div>
+
+  <div class="wp-page" id="wpSpare"></div>
+  <div class="wp-page" id="wpInstall"></div>
+  <div class="wp-page" id="wpTraining"></div>
+  <div class="wp-page" id="wpIncentive"></div>
+  <div class="wp-page" id="wpVehicleRepair"></div>
+
+  <footer>数据保存在本浏览器本地（localStorage）· 中文科目列可双击编辑并自动保存 · 建议定期点击「备份数据」</footer>
+  </div><!-- /appFin -->
+
+  <!-- 工作日报 -->
+  <div class="app-view" id="appReport">
+    <div class="date-row">
+      <label>日期：</label>
+      <input type="date" id="drDate">
+    </div>
+
+    <div class="section" data-section="today">
+      <h2>今日工作</h2>
+      <div class="items"></div>
+      <button class="add-btn">+ 添加条目</button>
+    </div>
+
+    <div class="section" data-section="tomorrow">
+      <h2>明日计划</h2>
+      <div class="items"></div>
+      <button class="add-btn">+ 添加条目</button>
+    </div>
+
+    <div class="section" data-section="issues">
+      <h2>问题与待改进</h2>
+      <div class="items"></div>
+      <button class="add-btn">+ 添加条目</button>
+    </div>
+
+    <div class="section" data-section="notes">
+      <h2>备注</h2>
+      <div class="items"></div>
+      <button class="add-btn">+ 添加条目</button>
+    </div>
+
+    <div class="actions">
+      <button id="drExport" class="export-btn">导出 Word 文件</button>
+      <button id="drClear" class="clear-btn">清空内容</button>
+    </div>
+    <div class="status" id="drStatus"></div>
+  </div><!-- /appReport -->
+
+  </div>
+</div>
+
+<!-- 余额表验证弹窗 -->
+<div class="modal-overlay" id="vModal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>✓ 科目余额表验证</h3><p id="vSub"></p></div>
+      <button class="btn ghost" id="vClose">关闭 ✕</button>
+    </div>
+    <div class="modal-body" id="vBody"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="vReimport">↻ 重新导入余额表</button>
+      <label class="chk"><input type="checkbox" id="vOnlyDiff"> 仅看差异项</label>
+    </div>
+  </div>
+</div>
+
+<!-- 币种汇总弹窗 -->
+<div class="modal-overlay" id="cModal" style="display:none">
+  <div class="modal" style="max-width:880px">
+    <div class="modal-head">
+      <div><h3>🏦 银行存款 · 按币种汇总</h3><p id="cSub"></p></div>
+      <button class="btn ghost" id="cClose">关闭 ✕</button>
+    </div>
+    <div class="modal-body" id="cBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tplModal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div><h3>📋 选择控制程序表模板</h3><p>按科目分类选择预设模板，将自动填充对应控制类别</p></div>
+      <button class="btn ghost" id="tplClose">关闭 ✕</button>
+    </div>
+    <div class="modal-body" id="tplBody" style="display:grid; gap:10px;"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+   一、中英科目映射表
+   优先按科目编码匹配；无编码的表头/合计行按英文名称匹配
+===================================================== */
+const CN_CODE = {
+  "1000":"货币资金（现金及银行）","100001":"库存现金-印尼盾（小额备用金）","100002":"银行存款-工商银行(人民币)",
+  "100003":"银行存款-工商银行(印尼盾)","100004":"银行存款-BCA 3373","100005":"银行存款-BCA 0006",
+  "100006":"银行存款-Mandiri(印尼盾)","100007":"银行存款-BNI 9529","100008":"银行存款-NOBU(印尼盾)",
+  "100010":"银行存款-工商银行(美元)","100011":"银行存款-BCA 9666","100012":"银行存款-NOBU(美元)",
+  "100013":"银行存款-中国银行(印尼盾)","100014":"银行存款-UOB大华银行(印尼盾)","100015":"银行存款-中国银行(人民币)",
+  "100016":"银行存款-中国银行(人民币LCS 77395)","100017":"银行存款-中国银行(美元 85432)","100018":"库存现金-美元（小额备用金）",
+  "100019":"银行存款-BCA(印尼盾 2323)","100020":"银行存款-BCA(印尼盾 6989)","100021":"银行存款-BCA(美元 9589)",
+  "100022":"银行存款-BCA(印尼盾 1758)","100023":"银行存款-BCA(印尼盾 5999)","100024":"银行存款-BCA(印尼盾 5998)",
+  "100025":"银行存款-中国银行(印尼盾 4934)","100026":"银行存款-中国银行(人民币 4956)","100027":"银行存款-中国银行(美元 4978)",
+  "100028":"银行存款-BCA(美元 4889)","100029":"银行存款-工商银行(印尼盾 3078)","100032":"银行存款-BCA(印尼盾 7789)",
+  "100033":"银行存款-BCA(美元 7898)","100034":"银行存款-BCA(印尼盾 0550, Gaabor)","100035":"银行存款-BCA(人民币 0070, Gaabor)",
+  "100039":"银行存款-BCA(印尼盾 7128)","100040":"银行存款-BNI(印尼盾 202505)","100044":"银行存款-BNI(印尼盾 014148)",
+  "100098":"定期存款","100099":"在途资金（过渡科目）",
+  "1100":"应收账款","110001":"应收账款-印尼盾","110002":"应收账款-人民币","110003":"应收账款-美元",
+  "110004":"应收账款-增值税调整","110005":"预付采购款-印尼盾","110006":"预付采购款-人民币","110007":"预付采购款-美元",
+  "110008":"应收股东款","110009":"员工借款","110010":"其他应收款","110011":"其他应收款（供应商）",
+  "110012":"坏账准备（应收账款减值准备）",
+  "1200":"存货","120001":"库存商品","120002":"发出商品","120003":"原材料","120004":"在产品","120005":"在途物资","120006":"备品备件",
+  "1300":"预付费用","130001":"预付租金（办公楼/仓库）","130002":"预付保险费","130003":"增值税进项税额 (PPN-In)",
+  "130004":"预缴所得税-PPh 23","130005":"预付利息费用","130006":"其他预付款","130007":"预缴所得税-PPh 4(2)",
+  "130008":"预缴所得税-PPh 22","130009":"预付租金","130010":"预付费用（一般）","130011":"预缴所得税-PPh 21",
+  "130012":"预计多缴税款","130013":"预缴所得税-PPh 25（分期）",
+  "1700":"固定资产原值","170001":"土地","170002":"房屋及建筑物","170003":"运输工具","170004":"机器设备","170005":"办公设备",
+  "1701":"使用权资产","170101":"使用权资产",
+  "1710":"累计折旧-固定资产","171002":"累计折旧-房屋及建筑物","171003":"累计折旧-运输工具","171004":"累计折旧-机器设备",
+  "171005":"累计折旧-办公设备","1711":"累计折旧-使用权资产","171101":"累计折旧-使用权资产",
+  "1702":"其他资产","170201":"长期股权投资-PT Flife Technologies Indonesia",
+  "170202":"长期股权投资-PT Marvel Manufacturing Indonesia","1720":"递延所得税资产",
+  "2000":"应付账款","200001":"应付账款-印尼盾","200002":"应付账款-人民币","200003":"应付账款-美元",
+  "2001":"预收销售款","200101":"预收销售款-印尼盾","200102":"预收销售款-人民币","200103":"预收销售款-美元","200104":"预收销售款-印尼盾(D)",
+  "2100":"应交税费","210001":"应交增值税-销项税额","210002":"应交所得税-PPh 21（个人所得税）","210003":"应交所得税-PPh 23",
+  "210004":"应交所得税-PPh 第4(2)条（最终税）","210005":"应交所得税-PPh 26（非居民）","210007":"应交所得税-PPh 22",
+  "210008":"应交增值税 (PPN)","210009":"应交所得税-PPh 29（汇算清缴）","210010":"应交所得税-PPh 25",
+  "2700":"应计费用","270001":"应计销售奖励费用 (Sell In)","270002":"应计专业服务费","270003":"应计组装费",
+  "270004":"应计清关及海运费","270005":"应计费用（一般）",
+  "2200":"暂估应付账款（已收货未开票）","2400":"短期借款","2500":"其他应付款","2501":"其他应付款（非经营性）",
+  "2600":"应付租赁款","2604":"租赁负债-使用权资产（一年内到期）",
+  "2401":"长期借款","2601":"应付租赁款（长期）","2602":"长期应付职工薪酬（员工福利负债）","2603":"递延所得税负债",
+  "2605":"租赁负债-使用权资产（长期）",
+  "3000":"实收资本（股本）","300001":"实缴资本","300002":"股利分配","300003":"留存收益","300004":"其他综合收益 (OCI)","300005":"库存股"
+};
+const CN_NAME = {
+  "ASSETS":"资产","CURRENT ASSETS":"流动资产","Cash and Bank":"货币资金","Total Cash and Bank":"货币资金小计",
+  "Account Receivable":"应收账款","Total Account Receivable":"应收账款小计","Inventory":"存货","Total Inventory":"存货小计",
+  "Other Current Assets":"其他流动资产","Total Other Current Assets":"其他流动资产小计","Total CURRENT ASSETS":"流动资产合计",
+  "FIXED ASSETS":"固定资产","Historical Value":"固定资产原值","Total Historical Value":"固定资产原值小计",
+  "Accumulated Depreciation":"累计折旧","Total Accumulated Depreciation":"累计折旧小计","Total FIXED ASSETS":"固定资产合计",
+  "OTHER ASSETS":"其他资产","Total OTHER ASSETS":"其他资产合计","Total ASSETS":"资产总计",
+  "LIABILITIES and EQUITIES":"负债和所有者权益","LIABILITIES":"负债","Current Liabilities":"流动负债",
+  "Account Payables":"应付账款","Total Account Payables":"应付账款小计",
+  "Total Advance Sales / Uang Muka Penjualan":"预收销售款小计","Total Current Liabilities":"流动负债合计",
+  "Other Current Liabilities":"其他流动负债","Total Other Current Liabilities":"其他流动负债小计",
+  "Long Term Liabilities":"非流动负债（长期负债）","Total Long Term Liabilities":"非流动负债合计",
+  "Total LIABILITIES":"负债合计","EQUITIES":"所有者权益","Current Retained Earning":"本年利润（当期留存收益）",
+  "Total EQUITIES":"所有者权益合计","Total LIABILITIES and EQUITIES":"负债和所有者权益总计"
+};
+
+/* 利润表科目编码 → 中文 */
+const CN_PL_CODE = {
+  "4000":"营业收入","400001":"销售收入","400002":"安装收入","400003":"运费收入",
+  "400004":"销售折扣(IDR)","400007":"备件收入","400008":"维修收入",
+  "5000":"营业成本","500001":"主营业务成本","500002":"清关费","500003":"进口关税",
+  "500004":"进口运费","500005":"安装成本","500006":"组装费",
+  "6100":"销售费用","610001":"广告费","610003":"公关费","610005":"陈列费",
+  "610006":"合作费","610009":"纪念品费","610010":"促销费","610011":"活动费",
+  "610014":"广告税(Reklame)","610015":"新品推广费","610016":"营销耗材费",
+  "6201":"工资及员工津贴","620101":"工资","620102":"员工津贴","620103":"员工保险费",
+  "620104":"节日津贴(THR)","620105":"员工佣金","620106":"遣散费","620107":"员工福利费",
+  "620199":"税务津贴",
+  "6203":"水电/行政/租金等","620301":"电费","620302":"水费","620303":"通讯费",
+  "620304":"手机话费","620305":"快递配送费","620306":"国内差旅费","620307":"办公用品费",
+  "620308":"车辆税费(STNK/KIR)","620309":"税费","620310":"签证费","620312":"外籍员工休假费",
+  "620313":"办公室租金","620314":"海外差旅费","620315":"油费/过路费/停车费","620316":"网络费",
+  "620317":"文件及法务费","620318":"保险费","620319":"招聘费","620320":"SNI服务费",
+  "620321":"软件费","620322":"文具及印花税","620323":"办公室装修费","620324":"招待费",
+  "620325":"租车费","620326":"寄件费","620327":"货物保险及快递","620328":"仓库租金",
+  "620329":"报纸费","620330":"管理费","620331":" Household(家政)费用","620332":"房屋租金",
+  "620333":"PPh 21税费","620334":"专业服务费/顾问费","620335":"项目咨询费",
+  "620336":"项目佣金费","620337":"佣金费","620338":"印刷费","620339":"坏账费用",
+  "620340":"捐赠支出","620341":"印花税","620398":"应收账款减值准备","620399":"其他费用",
+  "6204":"维修保养费","620401":"房屋维修费","620402":"设备维修费","620403":"车辆维修费",
+  "6205":"客户激励费","620501":"销售激励费","620502":"安装激励费",
+  "6300":"折旧费用","630001":"折旧-房屋","630002":"折旧-车辆","630003":"折旧-设备",
+  "630004":"折旧-办公器具","6301":"使用权资产折旧","630101":"使用权资产折旧",
+  "6400":"售后服务及产品费用","640002":"保修费","640003":"备件费","640004":"安装耗材费",
+  "640005":"老客户服务费","640006":"服务中心费用","640007":"培训费","640008":"产品检测费",
+  "640010":"安装奖励","640011":"维修费","640012":"RMA费用",
+  "6500":"项目费用","650001":"项目保险费","650002":"其他项目费用",
+  "7090":"财务费用","709001":"利息收入","709002":"银行手续费","709003":"汇兑损益",
+  "709004":"借款利息支出","709005":"金融服务最终税",
+  "7100":"营业外收入","710002":"设备车辆出售收入","710099":"其他收入",
+  "7200":"营业外支出","720006":"固定资产处置损益","720007":"投资损益",
+  "7300":"企业所得税","730001":"企业所得税及递延所得税"
+};
+/* 利润表标题行 → 中文 */
+const CN_PL_NAME = {
+  "OPERATING REVENUE":"营业收入","Total OPERATING REVENUE":"营业收入合计",
+  "Cost of Goods Sold":"营业成本","Total Cost of Goods Sold":"营业成本合计",
+  "GROSS PROFIT":"毛利","Operating Expenses":"营业费用","Total Operating Expenses":"营业费用合计",
+  "INCOME FROM OPERATION":"营业利润","Other Income and Expenses":"营业外收支",
+  "Total Other Income and Expenses":"营业外收支合计",
+  "Biaya Finance":"财务费用","Total Biaya Finance":"财务费用小计",
+  "Other Income":"营业外收入","Total Other Income":"营业外收入小计",
+  "Other Expenses":"营业外支出","Total Other Expenses":"营业外支出小计",
+  "NET PROFIT/LOSS (Before Tax)":"税前净利润","NET PROFIT/LOSS (After Tax)":"税后净利润",
+  "Corporate Income Tax & Deffered Income Tax":"企业所得税及递延所得税"
+};
+
+/* =====================================================
+   二、内嵌首期数据（2026-08-31，来源：BS for English.xlsx）
+===================================================== */
+const EMBEDDED = {"company":"PT Gree Electric Appliances Indonesia","title":"Balance Sheet","date":"2026-08-31","rows":[
+{"lv":0,"code":"","en":"ASSETS","amt":null},{"lv":1,"code":"","en":"CURRENT ASSETS","amt":null},{"lv":2,"code":"","en":"Cash and Bank","amt":null},
+{"lv":3,"code":"1000","en":"Kas & Bank","amt":1242301073147},{"lv":4,"code":"100001","en":"Petty Cash IDR / Kas Kecil IDR","amt":4732209},
+{"lv":4,"code":"100002","en":"ICBC-CNY","amt":0},{"lv":4,"code":"100003","en":"ICBC-IDR","amt":0},{"lv":4,"code":"100004","en":"BCA 3373","amt":0},
+{"lv":4,"code":"100005","en":"BCA 0006","amt":21485968592},{"lv":4,"code":"100006","en":"MANDIRI-IDR","amt":1444283090},
+{"lv":4,"code":"100007","en":"BNI 9529","amt":0},{"lv":4,"code":"100008","en":"NOBU - IDR","amt":34781699},{"lv":4,"code":"100010","en":"ICBC-USD","amt":0},
+{"lv":4,"code":"100011","en":"BCA 9666","amt":649327677},{"lv":4,"code":"100012","en":"NOBU-USD","amt":5417118},{"lv":4,"code":"100013","en":"BOC-IDR","amt":517548351},
+{"lv":4,"code":"100014","en":"UOB-IDR","amt":28709264959},{"lv":4,"code":"100015","en":"BOC-CNY","amt":2430705115},
+{"lv":4,"code":"100016","en":"BOC-CNY-LCS 77395","amt":32452},{"lv":4,"code":"100017","en":"BOC-USD 85432","amt":2048481755},
+{"lv":4,"code":"100018","en":"Petty Cash USD","amt":33635700},{"lv":4,"code":"100019","en":"BCA-IDR 2323","amt":44661565},
+{"lv":4,"code":"100020","en":"BCA-IDR 6989","amt":34930122},{"lv":4,"code":"100021","en":"BCA-USD 9589","amt":464425438659},
+{"lv":4,"code":"100022","en":"BCA-IDR 1758","amt":832877775},{"lv":4,"code":"100023","en":"BCA IDR 5999","amt":0},
+{"lv":4,"code":"100024","en":"BCA IDR 5998","amt":0},{"lv":4,"code":"100025","en":"BOC IDR 4934","amt":0},{"lv":4,"code":"100026","en":"BOC CNY 4956","amt":0},
+{"lv":4,"code":"100027","en":"BOC USD 4978","amt":0},{"lv":4,"code":"100028","en":"BCA USD 4889","amt":0},{"lv":4,"code":"100029","en":"ICBC IDR 3078","amt":104213037},
+{"lv":4,"code":"100032","en":"BCA IDR 7789","amt":0},{"lv":4,"code":"100033","en":"BCA USD 7898","amt":0},
+{"lv":4,"code":"100034","en":"BCA IDR 0550 (Gaabor)","amt":0},{"lv":4,"code":"100035","en":"BCA CNY 0070 (Gaabor)","amt":0},
+{"lv":4,"code":"100039","en":"BCA IDR 7128","amt":23977027509},{"lv":4,"code":"100040","en":"BNI IDR 202505","amt":693619599878},
+{"lv":4,"code":"100044","en":"BNI IDR 014148","amt":0},{"lv":4,"code":"100098","en":"Deposito","amt":1898145885},
+{"lv":4,"code":"100099","en":"Transit Accoount / Ayat Silang","amt":0},{"lv":2,"code":"","en":"Total Cash and Bank","amt":1242301073147},
+{"lv":2,"code":"","en":"Account Receivable","amt":null},{"lv":3,"code":"1100","en":"Account receivable","amt":207710571672},
+{"lv":4,"code":"110001","en":"Account Receivable IDR / Piutang Dagang IDR","amt":161568170717},
+{"lv":4,"code":"110002","en":"Account Receivable CNY / Piutang dagang CNY","amt":0},
+{"lv":4,"code":"110003","en":"Account Receivable USD / Piutang Dagang USD","amt":0},
+{"lv":4,"code":"110004","en":"Account Receivable Adjustment VAT / Piutang Penyesuaian PPN","amt":0},
+{"lv":4,"code":"110005","en":"Advance Purchase IDR / Uang Muka Pembelian IDR","amt":0},
+{"lv":4,"code":"110006","en":"Advance Purchase CNY / Uang Muka Pembelian CNY","amt":0},
+{"lv":4,"code":"110007","en":"Advance Purchase USD / Uang Muka Pembelian USD","amt":50241114},
+{"lv":4,"code":"110008","en":"Account Receivable Shareholder / Piutang Pemegang Saham","amt":0},
+{"lv":4,"code":"110009","en":"Cash Advance Karyawan/ Piutang Karyawan","amt":35819316246},
+{"lv":4,"code":"110010","en":"Other Receivable / Piutang Lain-lain","amt":10750944000},
+{"lv":4,"code":"110011","en":"Other Receivable/ Piutang Lain-lain (Vendor)","amt":0},
+{"lv":4,"code":"110012","en":"Allowance for impairment losses on trade receivables","amt":-478100405},
+{"lv":2,"code":"","en":"Total Account Receivable","amt":207710571672},{"lv":2,"code":"","en":"Inventory","amt":null},
+{"lv":3,"code":"1200","en":"Inventory / Persediaan barang","amt":421935241994},{"lv":4,"code":"120001","en":"Inventory / Persediaan barang","amt":327265958500},
+{"lv":4,"code":"120002","en":"Goods in shipment / Barang Terkirim","amt":0},{"lv":4,"code":"120003","en":"Raw Material / Bahan Baku","amt":45882352954},
+{"lv":4,"code":"120004","en":"Work In Process / Persediaan Dalam Proses","amt":0},{"lv":4,"code":"120005","en":"Goods in Transit / Barang Transit","amt":36253139670},
+{"lv":4,"code":"120006","en":"Sparepart Inventory / Persediaan Sparepart","amt":12533790870},{"lv":2,"code":"","en":"Total Inventory","amt":421935241994},
+{"lv":2,"code":"","en":"Other Current Assets","amt":null},{"lv":3,"code":"1300","en":"Prepaid Expense","amt":234894485933},
+{"lv":4,"code":"130001","en":"Prepaid Rent / Sewa Gedung, Gudang  Dibayar Dimuka","amt":0},
+{"lv":4,"code":"130002","en":"Prepaid Insurance / Asuransi Dibayar Dimuka","amt":0},{"lv":4,"code":"130003","en":"PPN-In / PPn Masukan","amt":52193888735},
+{"lv":4,"code":"130004","en":"Uang Muka PPh 23 / Tax Advance","amt":25433094},{"lv":4,"code":"130005","en":"Prepaid Interest Exp / Biaya Bunga dibayar dimuka","amt":0},
+{"lv":4,"code":"130006","en":"Other Prepaid/Uang Muka Lainnya","amt":0},{"lv":4,"code":"130007","en":"Uang Muka PPH 4(2)/Tax adv. art 4(2)","amt":0},
+{"lv":4,"code":"130008","en":"Uang Muka PPH 22/Tax. Adv. Art 22","amt":139318487405},{"lv":4,"code":"130009","en":"Prepaid Rent/Sewa Dibayar Dimuka","amt":0},
+{"lv":4,"code":"130010","en":"prepaid  fee/biaya di bayar di muka(UMUM)","amt":7416031105},{"lv":4,"code":"130011","en":"Uang Muka PPH 21/Tax. Adv. Art 21","amt":0},
+{"lv":4,"code":"130012","en":"Estimasi Kelebihan Bayar Pajak","amt":19355688799},{"lv":4,"code":"130013","en":"Tax Advance PPh 25 / Angsuran PPh 25","amt":16584956795},
+{"lv":2,"code":"","en":"Total Other Current Assets","amt":234894485933},{"lv":1,"code":"","en":"Total CURRENT ASSETS","amt":2106841372746},
+{"lv":1,"code":"","en":"FIXED ASSETS","amt":null},{"lv":2,"code":"","en":"Historical Value","amt":null},
+{"lv":3,"code":"1700","en":"Aktiva Tetap","amt":34896198602},{"lv":4,"code":"170001","en":"Land / Tanah","amt":0},
+{"lv":4,"code":"170002","en":"Building / Bangunan","amt":1636363636},{"lv":4,"code":"170003","en":"Vehicle / Kendaraan","amt":22616564837},
+{"lv":4,"code":"170004","en":"Equipment / Peralatan","amt":2181794184},{"lv":4,"code":"170005","en":"Office Inventory / Inventaris Kantor","amt":8461475945},
+{"lv":3,"code":"1701","en":"Right-of-use assets","amt":13153580463},{"lv":4,"code":"170101","en":"Right-of-use assets","amt":13153580463},
+{"lv":2,"code":"","en":"Total Historical Value","amt":48049779065},{"lv":2,"code":"","en":"Accumulated Depreciation","amt":null},
+{"lv":3,"code":"1710","en":"Akumulasi Depresiasi Fixed Asset","amt":-16045932567},
+{"lv":4,"code":"171002","en":"Acc. Depr. Building / Akumulasi Penyusutan Gedung","amt":-450000006},
+{"lv":4,"code":"171003","en":"Acc. Depr. Vehicle / Akumulasi Penyusutan Kendaraan","amt":-9801123895},
+{"lv":4,"code":"171004","en":"Acc. Depr. Equipment /Akumulasi Penyusutan Peralatan","amt":-1700867902},
+{"lv":4,"code":"171005","en":"Acc. Depr. Office Inventory / Akm. Peny. Inventaris Kantor","amt":-4093940764},
+{"lv":3,"code":"1711","en":"Accumulated Depreciation Right-of-use assets","amt":-11880773083},
+{"lv":4,"code":"171101","en":"Accumulated Depreciation Right-of-use assets","amt":-11880773083},
+{"lv":2,"code":"","en":"Total Accumulated Depreciation","amt":-27926705650},{"lv":1,"code":"","en":"Total FIXED ASSETS","amt":20123073415},
+{"lv":1,"code":"","en":"OTHER ASSETS","amt":null},{"lv":2,"code":"1702","en":"Other Asset","amt":42947000},
+{"lv":3,"code":"170201","en":"Saham - PT Flife Technologies Indonesia","amt":0},
+{"lv":3,"code":"170202","en":"Saham - PT Marvel Manufacturing Indonesia","amt":42947000},
+{"lv":3,"code":"1720","en":"Deffered Tax Asset","amt":0},{"lv":1,"code":"","en":"Total OTHER ASSETS","amt":42947000},
+{"lv":0,"code":"","en":"Total ASSETS","amt":2127007393161},{"lv":0,"code":"","en":"LIABILITIES and EQUITIES","amt":null},
+{"lv":1,"code":"","en":"LIABILITIES","amt":null},{"lv":2,"code":"","en":"Current Liabilities","amt":null},
+{"lv":3,"code":"","en":"Account Payables","amt":null},{"lv":4,"code":"2000","en":"Account Payable / Hutang","amt":673186950047},
+{"lv":4,"code":"200001","en":"Account Payable IDR / Hutang dagang IDR","amt":11674497214},
+{"lv":4,"code":"200002","en":"Account Payable CNY / Hutang Dagang CNY","amt":9624957758},
+{"lv":4,"code":"200003","en":"Account Payable USD / Hutang Dagang USD","amt":651887495075},
+{"lv":3,"code":"","en":"Total Account Payables","amt":673186950047},
+{"lv":3,"code":"2001","en":"Advance Sales / Uang Muka Penjualan","amt":754135394655},
+{"lv":4,"code":"200101","en":"Advance Sales IDR / Uang Muka Penjualan IDR","amt":25505532335},
+{"lv":4,"code":"200102","en":"Advance Sales CNY / Uang Muka Penjualan CNY","amt":71480881},
+{"lv":4,"code":"200103","en":"Advance Sales USD / Uang Muka Penjualan USD","amt":0},
+{"lv":4,"code":"200104","en":"Advance Sales IDR (D) / Uang Muka Penjualan IDR (D)","amt":728558381439},
+{"lv":3,"code":"","en":"Total Advance Sales / Uang Muka Penjualan","amt":754135394655},
+{"lv":2,"code":"","en":"Total Current Liabilities","amt":1427322344702},{"lv":2,"code":"","en":"Other Current Liabilities","amt":null},
+{"lv":3,"code":"2100","en":"Tax payable / Hutang Pajak","amt":47396571957},{"lv":4,"code":"210001","en":"PPn - Out / PPn Keluaran","amt":50703695112},
+{"lv":4,"code":"210002","en":"Tax Payable - PPh 21 / Hutang PPh 21","amt":5093230425},{"lv":4,"code":"210003","en":"Tax Payable - PPh 23 / Hutang PPh 23","amt":3418140625},
+{"lv":4,"code":"210004","en":"Tax Payable PPh psl 4 ayat 2 / Hutang Pajak PPh psl 4 ayat 2","amt":82658622},
+{"lv":4,"code":"210005","en":"Tax Payable PPH 26 / Hutang Pajak PPH 26","amt":747786},{"lv":4,"code":"210007","en":"Tax Payable - PPh 22 / Hutang PPh 22","amt":0},
+{"lv":4,"code":"210008","en":"Tax Payable - Hutang PPN","amt":-10910157560},{"lv":4,"code":"210009","en":"Tax Payable - PPh 29 / Hutang PPh 29","amt":-1697856604},
+{"lv":4,"code":"210010","en":"Tax Payable - PPh 25 / Hutang PPh 25","amt":706113551},
+{"lv":3,"code":"2700","en":"Accrued Expenses/Biaya yang masih harus dibayar","amt":-1313030930},
+{"lv":4,"code":"270001","en":"Accrued Reward Sell In/Biaya Rewards Sell in yg hrs dibayar","amt":0},
+{"lv":4,"code":"270002","en":"Accrued Profesional Fee/ B. Akrual Tenaga Ahli","amt":0},
+{"lv":4,"code":"270003","en":"Accrued Assembling Fee / Biaya Akrual Perakitan","amt":-1313030930},
+{"lv":4,"code":"270004","en":"Accrued Custom Clearance & Ocean Freigh / Biaya Akrual Impor","amt":0},
+{"lv":4,"code":"270005","en":"Accrued (General) / B. Akrual (Umum)","amt":0},
+{"lv":3,"code":"2200","en":"Hutang Pembelian yang belum ditagih","amt":-166227737},{"lv":3,"code":"2400","en":"short term loans","amt":0},
+{"lv":3,"code":"2500","en":"Other Payable/Hutang Lain - Lain","amt":3517641055},{"lv":3,"code":"2501","en":"Other Payable (Non) /Hutang Lain - Lain (Non)","amt":0},
+{"lv":3,"code":"2600","en":"Leasing Payable/Hutang Leasing","amt":0},{"lv":3,"code":"2604","en":"Leasing Liability of ROU (Short Term)","amt":-170096704},
+{"lv":2,"code":"","en":"Total Other Current Liabilities","amt":49264857641},{"lv":2,"code":"","en":"Long Term Liabilities","amt":null},
+{"lv":3,"code":"2401","en":"long term loans","amt":0},{"lv":3,"code":"2601","en":"Leasing Payable/Hutang Leasing (Jangka Panjang)","amt":0},
+{"lv":3,"code":"2602","en":"Employee Benefit Liability / Penyisihan Imbalan Krj Karyawan","amt":1976049974},
+{"lv":3,"code":"2603","en":"Deferred tax liabilities","amt":908950510},{"lv":3,"code":"2605","en":"Leasing Liability of ROU (Long Term)","amt":445137794},
+{"lv":2,"code":"","en":"Total Long Term Liabilities","amt":3330138278},{"lv":1,"code":"","en":"Total LIABILITIES","amt":1479917340621},
+{"lv":1,"code":"","en":"EQUITIES","amt":null},{"lv":2,"code":"3000","en":"Capital / Modal","amt":548246538241},
+{"lv":3,"code":"300001","en":"Begining Capital / Modal di setor","amt":30000000000},{"lv":3,"code":"300002","en":"Deviden / Pembagian Laba","amt":-204641613611},
+{"lv":3,"code":"300003","en":"RETAINED EARNING / Laba ditahan ( berjalan )","amt":722373519218},
+{"lv":3,"code":"300004","en":"Other Comprehensive Income / OCI","amt":514632634},{"lv":3,"code":"300005","en":"Treasury Shares","amt":0},
+{"lv":3,"code":"","en":"Current Retained Earning","amt":98863734213},{"lv":1,"code":"","en":"Total EQUITIES","amt":647110272454},
+{"lv":0,"code":"","en":"Total LIABILITIES and EQUITIES","amt":2127027613075}]};
+
+/* 内嵌利润表数据（2026-08-31，来源：PL for English.xlsx） */
+const EMBEDDED_PL = [
+{"lv":0,"code":"","en":"OPERATING REVENUE","amt":null},
+{"lv":1,"code":"4000","en":"Sales / Penjualan","amt":2088599816335},
+{"lv":2,"code":"400001","en":"Sales / Penjualan","amt":2054810734898},
+{"lv":2,"code":"400002","en":"Instalation Sales / Pendapatan Instalasi","amt":22264513126},
+{"lv":2,"code":"400003","en":"Freight Revenue / Pendapatan Freight","amt":1066753692},
+{"lv":2,"code":"400004","en":"Sales Term Discount IDR / Potongan Penjualan IDR","amt":0},
+{"lv":2,"code":"400007","en":"Sparepart Income / Penjualan Sparepart","amt":10409592370},
+{"lv":2,"code":"400008","en":"Repair Income / Pendapatan Perbaikan","amt":48222249},
+{"lv":0,"code":"","en":"Total OPERATING REVENUE","amt":2088599816335},
+{"lv":0,"code":"","en":"Cost of Goods Sold","amt":0},
+{"lv":1,"code":"5000","en":"COGS","amt":1625941352870},
+{"lv":2,"code":"500001","en":"COGS / Harga Pokok Penjualan","amt":1475844195765},
+{"lv":2,"code":"500002","en":"Biaya Clearance","amt":11548835859},
+{"lv":2,"code":"500003","en":"Bea Masuk / Import Duty","amt":17339009},
+{"lv":2,"code":"500004","en":"Freight-in / Biaya Pengiriman Import","amt":41721181197},
+{"lv":2,"code":"500005","en":"Installasion Exp/Biaya Installasi","amt":96809801040},
+{"lv":2,"code":"500006","en":"Assembling Fee / Biaya Perakitan","amt":0},
+{"lv":0,"code":"","en":"Total Cost of Goods Sold","amt":1625941352870},
+{"lv":0,"code":"","en":"GROSS PROFIT","amt":462658463465},
+{"lv":0,"code":"","en":"Operating Expenses","amt":0},
+{"lv":2,"code":"6100","en":"Marketing Expense / Biaya Pemasaran","amt":19782188628},
+{"lv":3,"code":"610001","en":"Advertising Expense / Biaya Iklan","amt":3165425734},
+{"lv":3,"code":"610003","en":"Public Relationship Expense / Biaya Public Relationship","amt":201000000},
+{"lv":3,"code":"610005","en":"Display Expense / Biaya Display","amt":2875114648},
+{"lv":3,"code":"610006","en":"Partnership Expense /","amt":0},
+{"lv":3,"code":"610009","en":"Souvenir Expense / Biaya Souvenir","amt":0},
+{"lv":3,"code":"610010","en":"Promotion Expense / Biaya Promosi","amt":4637156261},
+{"lv":3,"code":"610011","en":"Event Expense / Biaya Event","amt":7421585646},
+{"lv":3,"code":"610014","en":"Pajak Reklame / Tax Reklame","amt":1232642331},
+{"lv":3,"code":"610015","en":"Biaya Perkenalan Produk / Launching Expense","amt":0},
+{"lv":3,"code":"610016","en":"Biaya Perlengkapan Marketing / Marketing supplies expense","amt":249264008},
+{"lv":2,"code":"6201","en":"Salary & Employee Allowance Exp / Gaji & Tunjangan Karyawan","amt":163829534749},
+{"lv":3,"code":"620101","en":"Salary Expense / Biaya Gaji","amt":57133680588},
+{"lv":3,"code":"620102","en":"Employee Allowance Expense / Biaya Tunjangan Karyawan","amt":3408439741},
+{"lv":3,"code":"620103","en":"Employee Insurance Expense / Biaya Asuransi Karyawan","amt":2594946498},
+{"lv":3,"code":"620104","en":"Holiday Allowance Expense / Biaya THR","amt":3103934778},
+{"lv":3,"code":"620105","en":"Commision Employee Exp / Biaya Komisi Karyawan","amt":97588533144},
+{"lv":3,"code":"620106","en":"Severance Pay Exp / Biaya Tunjangan Pesangon","amt":0},
+{"lv":3,"code":"620107","en":"Employee Benefit Expense / Beban Imbalan Krj Karyawan","amt":0},
+{"lv":3,"code":"620199","en":"Tax Allowance / Tunjangan Pajak","amt":0},
+{"lv":2,"code":"6203","en":"Utility, Adm,Rent,etc Expense / Utiliti, Adm, Sewa & lainnya","amt":85304216257},
+{"lv":3,"code":"620301","en":"Electric Expense / Biaya Listrik","amt":898358205},
+{"lv":3,"code":"620302","en":"Water Expense / Biaya PAM & Air minum","amt":128690956},
+{"lv":3,"code":"620303","en":"Communication Expense / Biaya Telekomunikasi","amt":64990087},
+{"lv":3,"code":"620304","en":"Phone Credit Expense / Biaya Pulsa Handphone","amt":9313274},
+{"lv":3,"code":"620305","en":"Expedition & Delivery Expense / Biaya Ekspedisi & Pengiriman","amt":39254498119},
+{"lv":3,"code":"620306","en":"Official Travel Expense / Biaya Perjalanan Dinas(indo)","amt":3254402510},
+{"lv":3,"code":"620307","en":"Office Equipmen & Supplies Exp / By Peralat&Perlengkapan ktr","amt":93351366},
+{"lv":3,"code":"620308","en":"STNK, KIR, Tax Vehicle Exp / Biaya STNK,KIR&Pajak Kendaraan","amt":228379318},
+{"lv":3,"code":"620309","en":"Tax Expense / Biaya Pajak","amt":200843211},
+{"lv":3,"code":"620310","en":"Visa Expense / biaya visa","amt":416526410},
+{"lv":3,"code":"620312","en":"Holiday Foreign Employee Expense / Biaya Libur Orang Asing","amt":0},
+{"lv":3,"code":"620313","en":"Rent Office Expense / biaya Sewa Kantor","amt":2281189853},
+{"lv":3,"code":"620314","en":"Official Travel Expense / Biaya Perjalanan Dinas (oversea)","amt":1454743472},
+{"lv":3,"code":"620315","en":"Gas, Tol, Parking, etc  Expense / biaya bbm/tol/parkir/taxi","amt":2104908965},
+{"lv":3,"code":"620316","en":"Internet Expense / Biaya  Internet","amt":309481406},
+{"lv":3,"code":"620317","en":"Document & Legal Expense / Biaya Document & Hukum","amt":1292673499},
+{"lv":3,"code":"620318","en":"Insurance Expense / Biaya Asuransi","amt":1861260803},
+{"lv":3,"code":"620319","en":"Recruitment Expense / Biaya Recruitment","amt":191116133},
+{"lv":3,"code":"620320","en":"SNI Service Expense / Biaya Jasa SNI","amt":1402134304},
+{"lv":3,"code":"620321","en":"Software Expense / Biaya Software Program","amt":666896037},
+{"lv":3,"code":"620322","en":"Stationery Expense / Biaya Alat Tulis Kantor & Materai","amt":124906590},
+{"lv":3,"code":"620323","en":"Renovation Office Exp / Biaya renovasi kantor","amt":859606071},
+{"lv":3,"code":"620324","en":"Entertaiment Expense / Biaya Entertainment","amt":4450832582},
+{"lv":3,"code":"620325","en":"Rent Vechile Exp / Biaya sewa mobil","amt":238379416},
+{"lv":3,"code":"620326","en":"Sent  Exp / Biaya Pengiriman","amt":134325833},
+{"lv":3,"code":"620327","en":"asurasi barang dan expedisi","amt":0},
+{"lv":3,"code":"620328","en":"Rent Warehouse Expanse / Biaya Sewa Gudang","amt":7868682657},
+{"lv":3,"code":"620329","en":"BIaya Surat Kabar / Newspaper Expense","amt":0},
+{"lv":3,"code":"620330","en":"Management Fee / Biaya Manajemen","amt":24337100},
+{"lv":3,"code":"620331","en":"Household Expense/Beban Rumah Tangga","amt":111966515},
+{"lv":3,"code":"620332","en":"Rent House Expense/Sewa Rumah","amt":0},
+{"lv":3,"code":"620333","en":"Tax Expense PPh 21/Biaya Pajak PPh 21","amt":7656067522},
+{"lv":3,"code":"620334","en":"Profesional Fee/Konsultan Fee","amt":79128205},
+{"lv":3,"code":"620335","en":"prj consult expense/biaya consult untuk prj case","amt":0},
+{"lv":3,"code":"620336","en":"Commission project expense / Biaya komisi proyek","amt":1230150643},
+{"lv":3,"code":"620337","en":"Commission Expenses / Biaya Komisi","amt":5154079334},
+{"lv":3,"code":"620338","en":"Printing Expense / Biaya Percetakan","amt":36423594},
+{"lv":3,"code":"620339","en":"Beban Piutang TakTertagih / Bad Debt Expense","amt":406276},
+{"lv":3,"code":"620340","en":"Donation Expense / Biaya Sumbangan","amt":829765560},
+{"lv":3,"code":"620341","en":"Duty Stamp Expense / Biaya Materai","amt":391630700},
+{"lv":3,"code":"620398","en":"Provision for impairment losses on trade receivables","amt":0},
+{"lv":3,"code":"620399","en":"Other Expenses / Beban lain-lain","amt":-230269},
+{"lv":2,"code":"6204","en":"Repair & Maintenance Expense","amt":1325001123},
+{"lv":3,"code":"620401","en":"Maintenance Building Expense / Biaya Pemeliharaan Gedung","amt":496981751},
+{"lv":3,"code":"620402","en":"Maintenance Equipment Exp / Biaya Pemeliharaan Peralatan","amt":55567446},
+{"lv":3,"code":"620403","en":"Maintenance Vehicle Exp / Biaya Pemeliharaan Kendaraan","amt":772451926},
+{"lv":2,"code":"6205","en":"Incentive Customer Expense","amt":47640464821},
+{"lv":3,"code":"620501","en":"Incentive for sellin Exp","amt":47640464821},
+{"lv":3,"code":"620502","en":"Incentive for Installasi/","amt":0},
+{"lv":1,"code":"6300","en":"Depreciation Expense / Biaya Penyusutan & Amortisasi","amt":2500837765},
+{"lv":2,"code":"630001","en":"Depr. Building Expense / Biaya Penyusutan Gedung","amt":54545456},
+{"lv":2,"code":"630002","en":"Depr. Vehicle Expense / Biaya Penyusutan Kendaraan","amt":1579990227},
+{"lv":2,"code":"630003","en":"Depr. Equipment Expense / Biaya Penyusutan Peralatan","amt":126213304},
+{"lv":2,"code":"630004","en":"Depr. Office Inventory Exp / Biaya Penyusutan Inventaris ktr","amt":740088778},
+{"lv":1,"code":"6301","en":"Depreciation Right-of-use Asset Exp","amt":571784318},
+{"lv":2,"code":"630101","en":"Depreciation Right-of-use Asset Exp","amt":571784318},
+{"lv":1,"code":"6400","en":"After Sales Service Expense & Product Expense","amt":20111921591},
+{"lv":2,"code":"640002","en":"Warranty Exp / Biaya Garansi","amt":8005005674},
+{"lv":2,"code":"640003","en":"Sparepart Exp / Biaya Sparepart","amt":7078282884},
+{"lv":2,"code":"640004","en":"Instalasi supplies expense / Biaya Perlengkapan Instalasi","amt":506235145},
+{"lv":2,"code":"640005","en":"Service Old Customer Exp / Biaya Service Cust Lama","amt":0},
+{"lv":2,"code":"640006","en":"Service Center Expense / Biaya Call Service Center","amt":0},
+{"lv":2,"code":"640007","en":"Training Expense / Biaya Training","amt":792572384},
+{"lv":2,"code":"640008","en":"Test Product Expense / Biaya Pengujian Barang","amt":0},
+{"lv":2,"code":"640010","en":"reward instalasi","amt":3625210203},
+{"lv":2,"code":"640011","en":"Service Exp/Biaya Perbaikan","amt":109725923},
+{"lv":2,"code":"640012","en":"RMA Expense / Biaya RMA","amt":-5110622},
+{"lv":1,"code":"6500","en":"Project Expense","amt":0},
+{"lv":2,"code":"650001","en":"Insurance Project Expense","amt":0},
+{"lv":2,"code":"650002","en":"Other Project Expense","amt":0},
+{"lv":0,"code":"","en":"Total Operating Expenses","amt":341065949252},
+{"lv":0,"code":"","en":"INCOME FROM OPERATION","amt":121592514213},
+{"lv":0,"code":"","en":"Other Income and Expenses","amt":0},
+{"lv":1,"code":"7090","en":"Biaya Finance","amt":23649214959},
+{"lv":2,"code":"709001","en":"Interest Income  Pendapatan Bunga","amt":-16805159521},
+{"lv":2,"code":"709002","en":"Adm bank Expense / Biaya Adm Bank & Buku Cek/Giro","amt":68462340},
+{"lv":2,"code":"709003","en":"Difference Valas Exchange / Selisih Kurs","amt":36990112711},
+{"lv":2,"code":"709004","en":"Interest exp / Biaya Bunga pinjaman","amt":34775322},
+{"lv":2,"code":"709005","en":"pph Final Atas Jasa Giro","amt":3361024107},
+{"lv":1,"code":"","en":"Total Biaya Finance","amt":23649214959},
+{"lv":1,"code":"7100","en":"Other Income","amt":922377114},
+{"lv":2,"code":"710002","en":"Sale of Equipment & Vehicle /Penjualan Peralatan & Kendaraan","amt":0},
+{"lv":2,"code":"710099","en":"Other Income / Pendapatan Lain-Lain","amt":922377114},
+{"lv":1,"code":"","en":"Total Other Income","amt":922377114},
+{"lv":1,"code":"7200","en":"Other Expenses","amt":1942155},
+{"lv":2,"code":"720006","en":"Gain/Loss Dispossal F.A","amt":1942155},
+{"lv":2,"code":"720007","en":"GAIN/LOSS OF INVESTMENT","amt":0},
+{"lv":1,"code":"","en":"Total Other Expenses","amt":1942155},
+{"lv":0,"code":"","en":"Total Other Income and Expenses","amt":-22728780000},
+{"lv":0,"code":"","en":"NET PROFIT/LOSS (Before Tax)","amt":98863734213},
+{"lv":0,"code":"7300","en":"Corporate Income Tax & Deffered Income Tax","amt":0},
+{"lv":1,"code":"730001","en":"Corporate Income Tax & Deffered Income Tax","amt":0},
+{"lv":0,"code":"","en":"NET PROFIT/LOSS (After Tax)","amt":98863734213}
+];
+
+/* =====================================================
+   三、数据存储（localStorage）
+===================================================== */
+const LS_PERIODS = 'fsv.periods.v1', LS_OVR = 'fsv.cnOverrides.v1', LS_ACTIVE = 'fsv.active.v1';
+const LS_WP = 'fsv.workpaper.v2';    // 全局格式 {code: {cur, purpose}}（不与期间联动）
+const LS_WP_V1 = 'fsv.workpaper.v1'; // 旧格式 {periodKey: {code: {cur, purpose}}}
+let PERIODS = load(LS_PERIODS, {});
+let OVR = load(LS_OVR, {});
+let activeKey = localStorage.getItem(LS_ACTIVE) || '';
+let stmtTab = 'bs';   /* 'bs' or 'pl' — 报表切换 */
+
+/* 旧版按期间保存的底稿数据 → 合并为全局一份（不与期间联动） */
+function migrateWP(raw){
+  if(!raw || Array.isArray(raw)) return {};
+  let old = false;
+  for(const k of Object.keys(raw))
+    if(/^\d{4}-\d{2}-\d{2}/.test(k) || k.startsWith('未命名期间')){ old = true; break; }
+  if(!old) return raw;
+  const out = {};
+  for(const per of Object.values(raw))
+    for(const [code, v] of Object.entries(per || {}))
+      out[code] = {...(out[code] || {}), ...v};
+  return out;
+}
+let WP = load(LS_WP, null);
+if(WP === null){ WP = migrateWP(load(LS_WP_V1, {})); saveWP(); }
+
+function load(k, dft){ try{ const v = JSON.parse(localStorage.getItem(k)); return v ?? dft; }catch(e){ return dft; } }
+function saveAll(){ localStorage.setItem(LS_PERIODS, JSON.stringify(PERIODS)); localStorage.setItem(LS_OVR, JSON.stringify(OVR)); }
+function saveWP(){ localStorage.setItem(LS_WP, JSON.stringify(WP)); }
+
+/* 首次打开：写入内嵌期间 */
+if(!Object.keys(PERIODS).length){
+  PERIODS[EMBEDDED.date] = {...EMBEDDED, pl: EMBEDDED_PL};
+  activeKey = EMBEDDED.date;
+  saveAll(); localStorage.setItem(LS_ACTIVE, activeKey);
+}
+if(!PERIODS[activeKey]) activeKey = Object.keys(PERIODS).sort()[0] || '';
+/* 迁移：为内嵌期间补/更新 PL 数据 */
+if(PERIODS[EMBEDDED.date]){
+  const oldPl = PERIODS[EMBEDDED.date].pl;
+  if(!oldPl || oldPl.length < 100){
+    PERIODS[EMBEDDED.date].pl = EMBEDDED_PL; saveAll();
+  }
+}
+
+/* =====================================================
+   四、工具函数
+===================================================== */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtAmt(n){
+  if(n === null || n === undefined) return '';
+  if(n === 0) return '<span style="color:#b9c6bf">-</span>';
+  const abs = Math.abs(n).toLocaleString('en-US');
+  return n < 0 ? `(${abs})` : abs;
+}
+function fmtAmtRaw(n){
+  if(n === null || n === undefined) return '';
+  return n.toLocaleString('en-US');
+}
+function cnKeyOf(row){ return row.code ? row.code : ('name:' + row.en); }
+function cnFor(row){
+  const k = cnKeyOf(row);
+  if(stmtTab === 'pl') return OVR[k] ?? CN_PL_CODE[row.code] ?? CN_PL_NAME[row.en] ?? '';
+  return OVR[k] ?? CN_CODE[row.code] ?? CN_NAME[row.en] ?? '';
+}
+function isTotalName(en){ return /^Total\s/i.test(en || ''); }
+function periodLabel(key){
+  const m = key.match(/(20\d{2})-(\d{2})/);
+  return m ? `${m[1]}年${parseInt(m[2])}月` : key;
+}
+
+/* =====================================================
+   五、Excel 解析（导入新期间）
+===================================================== */
+function parseWorkbook(wb){
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  let company = '', title = '', date = '', isPL = false;
+  const pad = n => String(n).padStart(2,'0');
+  for(let r = 0; r < Math.min(8, aoa.length); r++){
+    const row = aoa[r] || [];
+    for(let ci = row.length - 1; ci >= 0; ci--){
+      const cell = row[ci];
+      if(cell === null || cell === undefined) continue;
+      const s = String(cell).trim();
+      if(/单位[:：]/.test(s)) company = s.replace(/单位[:：]/,'').trim();
+      else if(/balance sheet/i.test(s) && !title){ title = s; isPL = false; }
+      else if(/profit/i.test(s) && !title){ title = s; isPL = true; }
+      else if(!date){
+        if(cell instanceof Date && !isNaN(cell)) date = `${cell.getFullYear()}-${pad(cell.getMonth()+1)}-${pad(cell.getDate())}`;
+        else {
+          const m = s.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+          if(m) date = `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+          else if(typeof cell === 'number' && cell > 40000 && cell < 60000){
+            const d = XLSX.SSF.parse_date_code(cell);
+            if(d) date = `${d.y}-${pad(d.m)}-${pad(d.d)}`;
+          }
+        }
+      }
+    }
+  }
+  const rows = [];
+  /* 动态检测列偏移：XLSX 可能跳过空的 A 列导致整体左移 */
+  let offset = 0;
+  for(let r = 4; r < Math.min(30, aoa.length); r++){
+    const row = aoa[r] || [];
+    for(let c = 0; c < Math.min(3, row.length); c++){
+      const v = row[c];
+      if(v !== null && v !== undefined && /^\d{4,6}$/.test(String(v).trim())){
+        offset = c - 1;   /* code 预期在列 1，实际在列 c → 偏移量 */
+        break;
+      }
+    }
+    if(offset !== 0) break;
+  }
+  /* BS: C-H → lv0-4, amount col I(8); PL: D-G → lv0-3, amount col J(9) */
+  const lvMap = {};
+  const baseLvMap = isPL ? {3:0, 4:1, 5:2, 6:3} : {2:0, 3:1, 4:2, 5:3, 6:4, 7:4};
+  for(const [c, lv] of Object.entries(baseLvMap)) lvMap[+c + offset] = lv;
+  const amtCol = (isPL ? 9 : 8) + offset;
+  const nameStart = (isPL ? 3 : 2) + offset;
+  const nameEnd = (isPL ? 6 : 7) + offset;
+  for(let r = 4; r < aoa.length; r++){
+    const row = aoa[r] || [];
+    let code = row[1 + offset];
+    code = (code === null || code === undefined) ? '' : String(code).trim();
+    let en = null, lv = null;
+    for(let c = nameStart; c <= nameEnd; c++){
+      const v = row[c];
+      if(v !== null && v !== undefined && String(v).trim() !== ''){ en = String(v).trim(); lv = lvMap[c]; break; }
+    }
+    let amt = row[amtCol];
+    amt = (typeof amt === 'number' && isFinite(amt)) ? Math.round(amt) : null;
+    if(en === null && code === '') continue;
+    if(en !== null && /^0+$/.test(en)) continue;
+    rows.push({lv: lv ?? (isPL ? 3 : 4), code, en: en ?? '', amt});
+  }
+  if(!rows.length) throw new Error('未能从文件中识别到报表数据，请确认文件格式与本期报表一致');
+  return {company: company || '未知公司', title: title || (isPL ? 'Profit and Loss' : 'Balance Sheet'), date, rows, isPL};
+}
+
+/* =====================================================
+   五·二、科目余额表解析与验证
+   符号规则：资产类(1开头) 借方正；负债/权益类(2/3开头) 贷方正
+===================================================== */
+function parseTB(wb){
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  let hr = -1, period = '';
+  for(let r = 0; r < Math.min(12, aoa.length); r++){
+    const row = aoa[r] || [];
+    if(row.some(c => c !== null && String(c).trim() === 'Acct Code')){ hr = r; break; }
+    for(const c of row){
+      const m = String(c ?? '').match(/(20\d{2}-\d{2})\s*--\s*(20\d{2}-\d{2})/);
+      if(m) period = m[2];
+    }
+  }
+  if(hr < 0) throw new Error('未找到余额表表头（Acct Code 行），请确认文件格式');
+  const num = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v) : 0;
+  const accounts = {};
+  for(let r = hr + 1; r < aoa.length; r++){
+    const row = aoa[r] || [];
+    const code = String(row[0] ?? '').trim();
+    if(!code || /^total/i.test(code)) continue;
+    const nameRaw = String(row[1] ?? '').trim();
+    accounts[code] = {
+      name: nameRaw.includes('\\') ? nameRaw.split('\\').slice(1).join('\\') : nameRaw,
+      open: num(row[3]), debit: num(row[4]), credit: num(row[5]),
+      closeDir: String(row[8] ?? '').trim(), closing: num(row[9])
+    };
+  }
+  return {period, accounts};
+}
+/* 余额表科目 → 报表口径带符号金额 */
+function tbBsValue(code, a){
+  const signed = a.closeDir === 'Debit' ? a.closing : a.closeDir === 'Credit' ? -a.closing : 0; // 借方正
+  return code[0] === '1' ? signed : -signed;
+}
+function tbPlValue(code, a){
+  /* 利润表口径：收入(4xxx/71xx)贷方为正、成本费用(5-7xxx除71)借方为正，与报表一致 */
+  const isRevenue = code[0] === '4' || (code[0] === '7' && code[1] === '1');
+  if(isRevenue) return a.closeDir === 'Credit' ? a.closing : -a.closing;
+  return a.closeDir === 'Debit' ? a.closing : -a.closing;
+}
+function verifyTB(p){
+  const tb = p.tb.accounts;
+  const bsCodes = p.rows.filter(r => r.code).map(r => r.code);
+  const plRows = p.pl || [];
+  const plCodes = plRows.filter(r => r.code).map(r => r.code);
+  const allCodes = new Set([...bsCodes, ...plCodes]);
+  const isGroup = (code, codes) => codes.some(o => o.length > code.length && o.startsWith(code));
+  const results = [];
+  /* BS 科目核对 */
+  for(const row of p.rows){
+    if(!row.code || row.amt === null || row.amt === undefined) continue;
+    let expected = null, note = '';
+    if(isGroup(row.code, bsCodes)){
+      expected = 0; note = '汇总';
+      for(const [tc, ta] of Object.entries(tb))
+        if(tc.length > row.code.length && tc.startsWith(row.code)) expected += tbBsValue(tc, ta);
+    }else{
+      const ta = tb[row.code];
+      if(ta) expected = tbBsValue(row.code, ta);
+    }
+    if(expected === null){
+      if(row.amt !== 0) results.push({code: row.code, en: row.en, bs: row.amt, tb: null, diff: null, status: 'noTb', note, stmt: 'BS'});
+      continue;
+    }
+    const diff = row.amt - expected;
+    results.push({code: row.code, en: row.en, bs: row.amt, tb: expected, diff,
+      status: Math.abs(diff) < 1 ? 'ok' : 'diff', note, stmt: 'BS'});
+  }
+  /* PL 科目核对 */
+  for(const row of plRows){
+    if(!row.code || row.amt === null || row.amt === undefined) continue;
+    let expected = null, note = '';
+    if(isGroup(row.code, plCodes)){
+      expected = 0; note = '汇总';
+      for(const [tc, ta] of Object.entries(tb))
+        if(tc.length > row.code.length && tc.startsWith(row.code)) expected += tbPlValue(tc, ta);
+    }else{
+      const ta = tb[row.code];
+      if(ta) expected = tbPlValue(row.code, ta);
+    }
+    if(expected === null){
+      if(row.amt !== 0) results.push({code: row.code, en: row.en, bs: row.amt, tb: null, diff: null, status: 'noTb', note, stmt: 'PL'});
+      continue;
+    }
+    const diff = row.amt - expected;
+    results.push({code: row.code, en: row.en, bs: row.amt, tb: expected, diff,
+      status: Math.abs(diff) < 1 ? 'ok' : 'diff', note, stmt: 'PL'});
+  }
+  /* 损益类净额 vs 报表「Current Retained Earning」 */
+  let pl = null;
+  const cre = p.rows.find(r => r.en === 'Current Retained Earning');
+  if(cre){
+    let s = 0;
+    for(const [tc, ta] of Object.entries(tb))
+      if('4567'.includes(tc[0])) s += ta.closeDir === 'Credit' ? ta.closing : -ta.closing;
+    pl = {bs: cre.amt, tb: s, diff: cre.amt - s};
+  }
+  /* 余额表非零但报表未列示的科目 */
+  const listed = new Set(allCodes);
+  const unlisted = [];
+  for(const [tc, ta] of Object.entries(tb)){
+    if(!'1234567'.includes(tc[0]) || listed.has(tc)) continue;
+    const v = '123'.includes(tc[0]) ? tbBsValue(tc, ta) : tbPlValue(tc, ta);
+    if(v !== 0) unlisted.push({code: tc, en: ta.name, tb: v, stmt: '123'.includes(tc[0]) ? 'BS' : 'PL'});
+  }
+  return {results, pl, unlisted};
+}
+let lastVerify = null;
+function updateVerifyBtn(){
+  const has = !!(PERIODS[activeKey] && PERIODS[activeKey].tb);
+  $('#btnVerify').innerHTML = has
+    ? '✓ 余额表验证 <span style="width:8px;height:8px;border-radius:50%;background:#ffd75e;display:inline-block" title="该期间已导入余额表"></span>'
+    : '✓ 余额表验证';
+}
+function renderVerifyBody(){
+  const p = PERIODS[activeKey], v = lastVerify;
+  if(!p || !p.tb || !v) return;
+  const onlyDiff = $('#vOnlyDiff').checked;
+  const okN = v.results.filter(r => r.status === 'ok').length;
+  const diffN = v.results.filter(r => r.status === 'diff').length;
+  const noTbN = v.results.filter(r => r.status === 'noTb').length;
+  let td = 0, tc = 0;
+  for(const a of Object.values(p.tb.accounts)){
+    if(a.closeDir === 'Debit') td += a.closing; else if(a.closeDir === 'Credit') tc += a.closing;
+  }
+  const tbBalanced = Math.abs(td - tc) < 1;
+  $('#vSub').textContent = `报表期间：${periodLabel(activeKey)} (${activeKey}) · 余额表期末：${p.tb.period || '未识别'} · 余额表科目数：${Object.keys(p.tb.accounts).length}`;
+  /* BS/PL 勾稽：本年利润 vs 税后净利润 */
+  let html = '';
+  const cre = p.rows.find(r => r.en === 'Current Retained Earning');
+  const npt = (p.pl || []).find(r => r.en === 'NET PROFIT/LOSS (After Tax)');
+  if(cre && npt){
+    const match = Math.abs(cre.amt - npt.amt) < 1;
+    html += '<div class="chips">';
+    html += `<span class="chip ${match ? 'ok' : 'warn'}">${match ? '✓' : '⚠'} BS/PL 勾稽：本年利润 ${fmtAmtRaw(cre.amt)} ${match ? '=' : '≠'} 税后净利润 ${fmtAmtRaw(npt.amt)}${match ? '' : ` (差异 ${fmtAmtRaw(cre.amt - npt.amt)})`}</span>`;
+    html += '</div>';
+  }
+  html += '<div class="chips">';
+  html += `<span class="chip ${tbBalanced ? 'ok' : 'warn'}">余额表借贷${tbBalanced ? '平衡 ✓' : `不平 ✗ (借 ${td.toLocaleString('en-US')} ≠ 贷 ${tc.toLocaleString('en-US')})`}</span>`;
+  html += `<span class="chip ok">✓ 一致 ${okN} 项</span>`;
+  if(diffN) html += `<span class="chip warn">⚠ 差异 ${diffN} 项</span>`;
+  if(noTbN) html += `<span class="chip warn">⊘ 余额表缺失 ${noTbN} 项</span>`;
+  if(v.unlisted.length) html += `<span class="chip warn">⚠ 报表未列示 ${v.unlisted.length} 项</span>`;
+  if(v.pl){
+    const good = Math.abs(v.pl.diff) < 1;
+    html += `<span class="chip ${good ? 'ok' : 'warn'}">${good ? '✓' : '⚠'} 本年利润勾稽：报表 ${v.pl.bs.toLocaleString('en-US')} ${good ? '=' : '≠'} 损益类净额 ${v.pl.tb.toLocaleString('en-US')}${good ? '' : ` (差异 ${v.pl.diff.toLocaleString('en-US')})`}</span>`;
+  }
+  html += '</div>';
+  if(v.unlisted.length){
+    html += '<div class="warnbox"><h4>⚠ 以下科目在余额表中期末余额非零，但未按编码列示于报表（可能导致报表不平衡）：</h4>'
+      + '<table class="vtbl"><thead><tr><th>报表</th><th>科目编码</th><th>科目名称</th><th class="num">期末余额 (报表口径)</th></tr></thead><tbody>';
+    for(const u of v.unlisted)
+      html += `<tr><td>${esc(u.stmt)}</td><td class="code">${esc(u.code)}</td><td>${esc(u.en)}</td><td class="num">${fmtAmt(u.tb)}</td></tr>`;
+    html += '</tbody></table></div>';
+  }
+  const rows = v.results.filter(r => !onlyDiff || r.status !== 'ok');
+  html += '<table class="vtbl"><thead><tr><th>报表</th><th>科目编码</th><th>科目名称</th><th class="num">报表金额</th><th class="num">余额表期末 (报表口径)</th><th class="num">差异</th><th>状态</th></tr></thead><tbody>';
+  for(const r of rows){
+    const st = r.status === 'ok' ? '<span class="pill ok">✓ 一致</span>'
+      : r.status === 'diff' ? '<span class="pill diff">⚠ 差异</span>' : '<span class="pill gray">⊘ 余额表缺失</span>';
+    const diffCell = r.diff === null ? '—' : (Math.abs(r.diff) < 1 ? '-' : fmtAmt(r.diff));
+    html += `<tr class="${r.status === 'diff' ? 'row-diff' : ''}">
+      <td>${esc(r.stmt)}</td>
+      <td class="code">${esc(r.code)}${r.note === '汇总' ? ' <span style="color:#8a9a91;font-size:11px">(汇总)</span>' : ''}</td>
+      <td>${esc(r.en)}</td><td class="num">${fmtAmt(r.bs)}</td>
+      <td class="num">${r.tb === null ? '—' : fmtAmt(r.tb)}</td>
+      <td class="num ${r.diff !== null && Math.abs(r.diff) >= 1 ? 'neg' : ''}">${diffCell}</td><td>${st}</td></tr>`;
+  }
+  html += `</tbody></table>${rows.length ? '' : '<p style="text-align:center;color:#8a9a91;padding:20px">全部一致，无差异项</p>'}`;
+  $('#vBody').innerHTML = html;
+}
+function openVerify(){
+  if(!PERIODS[activeKey]){ alert('请先选择报表期间'); return; }
+  if(!PERIODS[activeKey].tb){ $('#tbInput').click(); return; }
+  lastVerify = verifyTB(PERIODS[activeKey]);
+  renderVerifyBody();
+  $('#vModal').style.display = 'flex';
+}
+
+/* =====================================================
+   六、渲染
+===================================================== */
+function renderTabs(){
+  const keys = Object.keys(PERIODS).sort();
+  $('#tabs').innerHTML = keys.map(k =>
+    `<span class="tab ${k===activeKey?'active':''}" data-key="${esc(k)}">
+       ${esc(periodLabel(k))}<span class="del" data-del="${esc(k)}" title="删除该期间">×</span>
+     </span>`).join('');
+}
+
+function render(){
+  renderTabs();
+  updateVerifyBtn();
+  const box = $('#stmt');
+  const p = PERIODS[activeKey];
+  if(!p){
+    box.innerHTML = `<div class="empty"><div class="big">📂</div>暂无报表数据，请点击右上角「导入报表」上传 Excel 文件</div>`;
+    return;
+  }
+  /* 选择数据源：BS or PL */
+  const isPL = stmtTab === 'pl';
+  const srcRows = isPL ? (p.pl || []) : p.rows;
+  const hasPL = !!(p.pl && p.pl.length);
+  /* 同步侧边栏 PL 可用状态 */
+  const navPL = $('#navPL');
+  if(navPL) navPL.classList.toggle('disabled', !hasPL);
+  /* BS 平衡校验 */
+  let badge = '';
+  if(!isPL){
+    const findAmt = name => { const r = p.rows.find(r => r.en === name); return r ? r.amt : null; };
+    const ta = findAmt('Total ASSETS'), tle = findAmt('Total LIABILITIES and EQUITIES');
+    if(ta !== null && tle !== null){
+      const diff = ta - tle;
+      badge = diff === 0
+        ? `<span class="badge ok">✓ 资产 = 负债 + 所有者权益</span>`
+        : `<span class="badge warn">⚠ 平衡差异：${esc(Math.abs(diff).toLocaleString('en-US'))}<br><small>资产 − 负债及权益 = ${esc(diff.toLocaleString('en-US'))}</small></span>`;
+    }
+  }
+
+  const q = $('#search').value.trim().toLowerCase();
+  const hideZero = $('#hideZero').checked;
+
+  const bodyRows = [];
+  let revenue = null;   /* 用于 PL 占比计算 */
+  if(isPL){
+    const revRow = srcRows.find(r => r.en === 'Total OPERATING REVENUE');
+    revenue = revRow ? revRow.amt : null;
+  }
+  const visibleIdx = [];   /* 记录可见行的原始索引 */
+  srcRows.forEach((row, idx) => {
+    const cn = cnFor(row);
+    if(hideZero && row.amt === 0 && row.lv >= 3) return;
+    if(q){
+      const hay = (row.code + ' ' + row.en + ' ' + cn).toLowerCase();
+      if(!hay.includes(q)) return;
+    }
+    visibleIdx.push(idx);
+    const isTotal = isTotalName(row.en);
+    const grand = row.lv === 0 && isTotal;
+    const sec = row.lv === 0 && !isTotal && row.amt === null;
+    const cls = ['lv' + row.lv];
+    if(sec) cls.push('sec');
+    if(isTotal) cls.push(grand ? 'grand-total' : 'total');
+    /* PL 占比列 */
+    let pctCell = '';
+    if(isPL && revenue && revenue !== 0 && row.amt !== null && row.amt !== undefined){
+      const pct = (row.amt / revenue * 100);
+      const color = row.amt < 0 ? 'var(--neg)' : (isTotal || grand) ? 'var(--green-dark)' : 'var(--muted)';
+      pctCell = `<td class="pct-col" style="color:${color}">${pct.toFixed(1)}%</td>`;
+    }else if(isPL){
+      pctCell = '<td class="pct-col"></td>';
+    }
+    const cnCell = row.en
+      ? `<td class="cn editable" data-idx="${idx}" title="双击编辑中文科目名称">${cn ? esc(cn) : '<span class="placeholder">双击补全…</span>'}</td>`
+      : `<td class="cn"></td>`;
+    /* 折叠标记：有下级可见子行的行 */
+    const nextVisibleIdx = visibleIdx.length;
+    let hasChildren = false;
+    for(let j = idx + 1; j < srcRows.length && srcRows[j].lv > row.lv; j++){
+      if(hideZero && srcRows[j].amt === 0 && srcRows[j].lv >= 3) continue;
+      if(q){ const h = (srcRows[j].code + ' ' + srcRows[j].en + ' ' + cnFor(srcRows[j])).toLowerCase(); if(!h.includes(q)) continue; }
+      hasChildren = true; break;
+    }
+    const toggleAttr = hasChildren ? ` data-toggle="1"` : '';
+    const toggleHtml = hasChildren ? '<span class="toggle-arrow">▼</span>' : '';
+    bodyRows.push(
+      `<tr class="${cls.join(' ')}${hasChildren ? ' collapsed-parent' : ''}" data-idx="${idx}"${toggleAttr}>
+        <td class="code">${esc(row.code)}</td>
+        <td class="name indent-${row.lv}">${toggleHtml}${esc(row.en)}</td>
+        <td class="num ${row.amt < 0 ? 'neg' : ''}">${fmtAmt(row.amt)}</td>
+        ${isPL ? pctCell : ''}${cnCell}
+      </tr>`);
+  });
+
+  const stmtTitle = isPL ? 'Profit and Loss' : p.title;
+  const stmtCnTitle = isPL ? '利润表' : '资产负债表';
+  const stmtMetaPeriod = isPL
+    ? `<span>报表期间：${esc(p.date)}</span>`
+    : `<span>报表日期：${esc(p.date)}</span>`;
+  const stmtMeta = isPL
+    ? `${stmtMetaPeriod}<span>币种：印尼盾 (IDR)</span><span>单位：盾 (元)</span>`
+    : `${stmtMetaPeriod}<span>币种：印尼盾 (IDR)</span><span>单位：盾 (元)</span>`;
+
+  box.innerHTML = `
+    <div class="stmt-head">
+      ${badge}
+      <div class="company">${esc(p.company)}</div>
+      <h2>${esc(stmtTitle)}</h2>
+      <div class="cn-title">${stmtCnTitle}</div>
+      <div class="meta">${stmtMeta}</div>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th style="width:90px">科目编码</th><th>科目名称 (English / Indonesia)</th>
+        <th class="num" style="width:180px">金额 (IDR)</th>${isPL ? '<th class="num pct-col">占营收比</th>' : ''}<th style="width:260px">中文科目名称</th></tr></thead>
+        <tbody>${bodyRows.join('') || `<tr><td colspan="4" style="text-align:center;padding:30px;color:#8a9a91">${isPL ? '该期间尚未导入利润表数据' : '无匹配记录'}</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div class="hint-bar">提示：双击「中文科目名称」列可编辑翻译（自动保存，并应用到所有期间）；负数显示为红色括号；金额单位：印尼盾。</div>`;
+  /* 折叠/展开事件 */
+  box.querySelectorAll('tr.collapsed-parent').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if(e.target.closest('td.cn.editable')) return;
+      const idx = +tr.dataset.idx;
+      const collapsed = tr.classList.toggle('collapsed');
+      const parentLv = srcRows[idx].lv;
+      let i = idx + 1;
+      while(i < srcRows.length && srcRows[i].lv > parentLv){
+        const childTr = box.querySelector(`tr[data-idx="${i}"]`);
+        if(childTr) childTr.classList.toggle('collapsed-child', collapsed);
+        i++;
+      }
+    });
+  });
+}
+
+/* =====================================================
+   七、交互事件
+===================================================== */
+/* 期间切换 / 删除 */
+$('#tabs').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if(del){
+    const k = del.dataset.del;
+    if(confirm(`确认删除期间 ${periodLabel(k)} 的报表数据？`)){
+      delete PERIODS[k]; saveAll();
+      if(activeKey === k) activeKey = Object.keys(PERIODS).sort()[0] || '';
+      localStorage.setItem(LS_ACTIVE, activeKey);
+      render();
+    }
+    return;
+  }
+  const tab = e.target.closest('.tab');
+  if(tab){ activeKey = tab.dataset.key; localStorage.setItem(LS_ACTIVE, activeKey); render(); }
+});
+
+/* 导入 Excel */
+$('#btnImport').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', async e => {
+  const files = [...e.target.files];
+  if(!files.length) return;
+  if(typeof XLSX === 'undefined'){ alert('Excel 解析库加载失败（需要联网加载 SheetJS）。请检查网络后刷新页面重试。'); return; }
+  let ok = 0, fail = [];
+  for(const f of files){
+    try{
+      const wb = XLSX.read(await f.arrayBuffer(), {type:'array', cellDates:true});
+      const p = parseWorkbook(wb);
+      let key = p.date;
+      if(!key){
+        const m = f.name.match(/(20\d{2})[-_.年]?(\d{2})[-_.月]?(\d{2})?/);
+        key = m ? `${m[1]}-${m[2]}-${m[3] || '01'}` : `未命名期间-${Date.now()}`;
+        p.date = key;
+      }
+      if(p.isPL){
+        /* 利润表：合并到已有期间，或新建期间 */
+        if(PERIODS[key]){
+          PERIODS[key].pl = p.rows;
+        }else{
+          PERIODS[key] = {company: p.company, title: 'Balance Sheet', date: key, rows: [], pl: p.rows};
+        }
+        activeKey = key; ok++;
+      }else{
+        /* 资产负债表：保留已有的利润表数据 */
+        if(PERIODS[key] && !confirm(`已存在期间 ${periodLabel(key)} 的数据，是否覆盖？`)) continue;
+        const oldPL = PERIODS[key]?.pl;
+        PERIODS[key] = p; if(oldPL) PERIODS[key].pl = oldPL;
+        activeKey = key; ok++;
+      }
+    }catch(err){ console.error(err); fail.push(`${f.name}：${err.message}`); }
+  }
+  saveAll(); localStorage.setItem(LS_ACTIVE, activeKey); render();
+  if(fail.length) alert('部分文件导入失败：\n' + fail.join('\n'));
+  else if(ok) alert(`成功导入 ${ok} 个期间的报表。`);
+  e.target.value = '';
+});
+
+/* 备份 / 恢复 */
+$('#btnBackup').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({periods: PERIODS, cnOverrides: OVR, workpaper: WP, rma: WPD.rma, repair: WPD.repair, warranty: WPD.warranty, spare: WPD.spare, install: WPD.install, training: WPD.training, incentive: WPD.incentive, vehicleRepair: WPD.vehicleRepair, dailyReport: (() => { try{ return JSON.parse(localStorage.getItem('daily_report_draft') || 'null'); }catch(e){ return null; } })()}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `财务报表备份_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+$('#btnRestore').addEventListener('click', () => $('#restoreInput').click());
+$('#restoreInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    if(!data.periods) throw new Error('备份文件格式不正确');
+    PERIODS = data.periods; OVR = data.cnOverrides || {}; WP = migrateWP(data.workpaper || {});
+    for(const t of Object.keys(EXP_WPS)){
+      WPD[t] = data[t] || {};
+      WPD[t].issues = (WPD[t].issues || []).map(it => ({
+    riskType: it.riskType || '舞弊',
+    desc: it.desc || '',
+    respond: it.respond || it.verify || '',
+    track: it.track || it.conclusion || '',
+    linkUrl: it.linkUrl || '',
+    linkName: it.linkName || '',
+    locked: !!it.locked
+  }));
+      WPD[t].voucherPeriod = WPD[t].voucherPeriod || '';
+      WPD[t].vouchers = Array.isArray(WPD[t].vouchers) ? WPD[t].vouchers.map(v => ({
+        no: v.no || '',
+        desc: v.desc || '',
+        counterAccount: v.counterAccount || '',
+        debit: (v.debit === undefined || v.debit === null) ? ((v.direction === '贷' || !v.amount) ? '' : v.amount) : v.debit,
+        credit: (v.credit === undefined || v.credit === null) ? ((v.direction === '贷') ? (v.amount ?? '') : '') : v.credit,
+        bizType: v.bizType || '',
+        initiator: v.initiator || '',
+        department: v.department || ''
+      })) : [];
+      const _DA = (typeof CTRL_TPLS !== 'undefined') ? CTRL_TPLS.expense.items : ['合理性授权','业务真实','价格公允','核算准确','收款方认定'];
+      const _rcp = WPD[t].ctrlPrograms;
+      let _arr = [];
+      if(Array.isArray(_rcp) && _rcp.length){
+        _arr = _rcp.map(cp => {
+          const rows = Array.isArray(cp.rows) ? cp.rows.map(r => ({assertion: r.assertion || '', measure: r.measure || '', procedure: r.procedure || '', result: r.result || ''})) : _DA.map(a => ({assertion: a, measure: '', procedure: '', result: ''}));
+          if(!rows.some(r => r.assertion === '计税正确')) rows.push({assertion:'计税正确', measure:'', procedure:'', result:''});
+          return {name: cp.name || '', policy: cp.policy || '', locked: !!cp.locked, rows};
+        });
+      }
+      if(!_arr.length) _arr = [{name:'', policy:'', locked:false, rows: _DA.map(a => ({assertion: a, measure: '', procedure: '', result: ''}))}];
+      WPD[t].ctrlPrograms = _arr;
+      saveW(t);
+    }
+    if(data.dailyReport){
+      localStorage.setItem('daily_report_draft', JSON.stringify(data.dailyReport));
+      if(DR_INITED) drLoadDraft();
+    }
+    saveAll(); saveWP();
+    activeKey = Object.keys(PERIODS).sort()[0] || '';
+    localStorage.setItem(LS_ACTIVE, activeKey);
+    render(); alert('恢复成功。');
+  }catch(err){ alert('恢复失败：' + err.message); }
+  e.target.value = '';
+});
+
+/* 搜索 / 隐藏零余额 / 打印 */
+$('#search').addEventListener('input', render);
+$('#hideZero').addEventListener('change', render);
+$('#btnPrint').addEventListener('click', () => window.print());
+
+/* 双击编辑中文名称 */
+$('#stmt').addEventListener('dblclick', e => {
+  const td = e.target.closest('td.cn.editable');
+  if(!td || td.querySelector('input')) return;
+  const idx = +td.dataset.idx;
+  const p = PERIODS[activeKey];
+  const rows = stmtTab === 'pl' ? (p.pl || []) : p.rows;
+  const row = rows[idx];
+  const cur = cnFor(row);
+  td.innerHTML = `<input value="${esc(cur)}" placeholder="输入中文科目名称">`;
+  const inp = td.querySelector('input');
+  inp.focus(); inp.select();
+  const commit = () => {
+    const v = inp.value.trim();
+    const k = cnKeyOf(row);
+    const defaultCN = stmtTab === 'pl' ? (CN_PL_CODE[row.code] ?? CN_PL_NAME[row.en]) : (CN_CODE[row.code] ?? CN_NAME[row.en]);
+    if(v && v !== defaultCN) OVR[k] = v;
+    else delete OVR[k];
+    saveAll(); render();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', ev => {
+    if(ev.key === 'Enter') inp.blur();
+    if(ev.key === 'Escape'){ inp.removeEventListener('blur', commit); render(); }
+  });
+});
+
+/* 余额表验证 */
+$('#btnVerify').addEventListener('click', openVerify);
+$('#vClose').addEventListener('click', () => $('#vModal').style.display = 'none');
+$('#vModal').addEventListener('click', e => { if(e.target === e.currentTarget) e.currentTarget.style.display = 'none'; });
+$('#vReimport').addEventListener('click', () => $('#tbInput').click());
+$('#vOnlyDiff').addEventListener('change', renderVerifyBody);
+$('#tbInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if(!f) return;
+  if(typeof XLSX === 'undefined'){ alert('Excel 解析库加载失败（需要联网加载 SheetJS）。请检查网络后刷新页面重试。'); return; }
+  try{
+    const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
+    const tb = parseTB(wb);
+    if(!Object.keys(tb.accounts).length) throw new Error('余额表中没有可识别的科目数据');
+    if(tb.period && !activeKey.startsWith(tb.period)
+       && !confirm(`余额表期末月份（${tb.period}）与当前报表期间（${activeKey}）不一致，仍要绑定到当前期间并验证吗？`)){ e.target.value = ''; return; }
+    PERIODS[activeKey].tb = tb;
+    saveAll(); updateVerifyBtn();
+    lastVerify = verifyTB(PERIODS[activeKey]);
+    renderVerifyBody();
+    $('#vModal').style.display = 'flex';
+  }catch(err){ console.error(err); alert('余额表导入失败：' + err.message); }
+  e.target.value = '';
+});
+
+/* =====================================================
+   八、银行存款按币种汇总
+===================================================== */
+/* 从科目名称推断币种：优先匹配显式标注，无标注的印尼本土银行账户推断为 IDR */
+const CUR_ORDER = ['IDR', 'CNY', 'USD', 'OTHER'];
+const CUR_LABEL = {IDR: '印尼盾 (IDR)', CNY: '人民币 (CNY)', USD: '美元 (USD)', OTHER: '其他/未明确'};
+function parseCurrency(en){
+  const s = (en || '').toUpperCase();
+  if(/\bUSD\b/.test(s) || s.includes('PETTY CASH USD')) return 'USD';
+  if(/\bCNY\b/.test(s)) return 'CNY';
+  if(/\bIDR\b/.test(s) || s.includes('PETTY CASH IDR')) return 'IDR';
+  /* 无显式币种标注：印尼公司主体，银行账户默认 IDR */
+  return 'IDR';
+}
+function isBankAccount(row){
+  /* 100001~100099 范围内的末级科目（6位编码），排除 100000（汇总）和 100098/100099 等特殊科目仍保留 */
+  if(!row.code || row.code.length < 6) return false;
+  if(!row.code.startsWith('1000')) return false;
+  if(row.code === '100000') return false;
+  return true;
+}
+function renderCurrency(){
+  const p = PERIODS[activeKey];
+  if(!p){ alert('请先选择报表期间'); return; }
+  /* 收集银行存款科目 */
+  const bankRows = p.rows.filter(isBankAccount);
+  /* 按币种分组 */
+  const groups = {};
+  for(const row of bankRows){
+    const cur = parseCurrency(row.en);
+    if(!groups[cur]) groups[cur] = [];
+    groups[cur].push(row);
+  }
+  /* 计算汇总 */
+  const summary = {};
+  let grandTotal = 0;
+  for(const cur of CUR_ORDER){
+    if(!groups[cur]) continue;
+    let sum = 0;
+    for(const r of groups[cur]) sum += r.amt || 0;
+    summary[cur] = {sum, count: groups[cur].length};
+    grandTotal += sum;
+  }
+  /* 余额表数据（如有）提供更丰富信息 */
+  const tb = p.tb ? p.tb.accounts : null;
+  /* 渲染 */
+  $('#cSub').textContent = `报表期间：${periodLabel(activeKey)} (${activeKey}) · 银行账户数：${bankRows.length} · 金额单位：印尼盾 (折算后)`;
+  let html = '';
+  /* 概览条形图 */
+  html += '<div class="cur-section"><h4>📊 币种分布概览</h4>';
+  for(const cur of CUR_ORDER){
+    if(!summary[cur]) continue;
+    const s = summary[cur];
+    const pct = grandTotal > 0 ? (s.sum / grandTotal * 100) : 0;
+    const barW = Math.max(pct, 2);
+    html += `<div class="bar-row">
+      <div class="bar-label"><span class="cur-badge cur-${cur}">${cur}</span></div>
+      <div class="bar-track"><div class="bar-fill ${cur}" style="width:${barW}%">${pct.toFixed(1)}%</div></div>
+      <div class="bar-amount">${fmtAmt(s.sum)}</div>
+      <div class="bar-pct">${s.count} 个账户</div>
+    </div>`;
+  }
+  html += `<div class="bar-row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">
+    <div class="bar-label" style="font-weight:700">合计</div>
+    <div class="bar-track" style="background:transparent"></div>
+    <div class="bar-amount" style="font-weight:700">${fmtAmt(grandTotal)}</div>
+    <div class="bar-pct">${bankRows.length} 个</div>
+  </div></div>`;
+  /* 分币种明细 */
+  for(const cur of CUR_ORDER){
+    if(!groups[cur]) continue;
+    const rows = groups[cur];
+    html += `<div class="cur-section"><h4><span class="cur-badge cur-${cur}">${cur}</span> ${CUR_LABEL[cur]} — ${summary[cur].count} 个账户，合计 ${fmtAmt(summary[cur].sum)}</h4>`;
+    html += '<table class="cur-table"><thead><tr><th style="width:90px">科目编码</th><th>账户名称</th>';
+    if(tb) html += '<th class="num" style="width:120px">期初余额</th><th class="num" style="width:120px">借方发生</th><th class="num" style="width:120px">贷方发生</th>';
+    html += '<th class="num" style="width:160px">期末余额 (报表)</th><th style="width:60px">币种</th></tr></thead><tbody>';
+    for(const r of rows){
+      const inferred = parseCurrency(r.en) === cur && !/\b(IDR|CNY|USD)\b/i.test(r.en);
+      const ta = tb ? tb[r.code] : null;
+      html += `<tr>
+        <td class="code">${esc(r.code)}</td>
+        <td>${esc(r.en)}</td>`;
+      if(tb) html += `<td class="num">${ta ? fmtAmt(ta.open) : '—'}</td><td class="num">${ta ? fmtAmt(ta.debit) : '—'}</td><td class="num">${ta ? fmtAmt(ta.credit) : '—'}</td>`;
+      html += `<td class="num ${r.amt < 0 ? 'neg' : ''}">${fmtAmt(r.amt)}</td>
+        <td><span class="cur-badge cur-${cur}">${cur}</span>${inferred ? '<span class="cur-inferred">推断</span>' : ''}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+  }
+  $('#cBody').innerHTML = html;
+  $('#cModal').style.display = 'flex';
+}
+
+/* =====================================================
+   九之三、费用类底稿（RMA费用 / 维修费 / 保修费及备件费）
+   每份底稿仅含问题页：科目描述 + 控制程序表（控制类别 / 控制程序 / 审计程序），可锁定
+   数据全局保存（不与期间联动）
+===================================================== */
+/* 控制程序表模板注册表 */
+const CTRL_TPLS = {
+  expense: { label:'费用类', desc:'适用于费用类科目（RMA / 维修 / 保修 / 备件 / 安装 / 培训等）', items:['合理授权','业务真实','价格公允','合同条款公允','核算准确','计税正确','收款方认定','合同签署受控'] }
+};
+const EXP_WPS = {
+  rma:      {key:'fsv.rma.v1',      title:'RMA费用底稿',        en:'RMA Expenses',           idx:'R-1', box:'wpRma',      accounts:['640012']},
+  repair:   {key:'fsv.repair.v1',   title:'维修费底稿',         en:'Repair & Maintenance',   idx:'R-2', box:'wpRepair',   accounts:['640011']},
+  warranty: {key:'fsv.warranty.v1', title:'保修费底稿',         en:'Warranty Expenses',      idx:'R-3', box:'wpWarranty', accounts:['640002']},
+  spare:    {key:'fsv.spare.v1',    title:'备件费底稿',         en:'Spare Parts',            idx:'R-4', box:'wpSpare',    accounts:['640003']},
+  install:  {key:'fsv.install.v1',  title:'安装奖励底稿',       en:'Installation Bonus',     idx:'R-5', box:'wpInstall',  accounts:['640010']},
+  training: {key:'fsv.training.v1', title:'培训费底稿',         en:'Training Fee',           idx:'R-6', box:'wpTraining', accounts:['640007']},
+  incentive:{key:'fsv.incentive.v1',title:'销售激励底稿',       en:'Sales Incentive',        idx:'R-7', box:'wpIncentive',accounts:['620501']},
+  vehicleRepair:{key:'fsv.vehicleRepair.v1',title:'车辆维修费底稿', en:'Vehicle Maintenance Expense', idx:'R-8', box:'wpVehicleRepair', accounts:['620403']}
+};
+const WPD = {};   // {rma:{vouchers:[], ctrlPrograms:[], ...}, ...}
+for(const t of Object.keys(EXP_WPS)){
+  WPD[t] = load(EXP_WPS[t].key, null);
+  if(WPD[t] === null) WPD[t] = {};
+  WPD[t].issues = (WPD[t].issues || []).map(it => ({
+    riskType: it.riskType || '舞弊',
+    desc: it.desc || '',
+    respond: it.respond || it.verify || '',
+    track: it.track || it.conclusion || '',
+    linkUrl: it.linkUrl || '',
+    linkName: it.linkName || '',
+    locked: !!it.locked
+  }));
+  /* vouchers：抽凭表数据（全局一份） */
+  WPD[t].voucherPeriod = WPD[t].voucherPeriod || '';
+  WPD[t].vouchers = Array.isArray(WPD[t].vouchers) ? WPD[t].vouchers.map(v => ({
+    no: v.no || '',
+    desc: v.desc || '',
+    counterAccount: v.counterAccount || '',
+    debit: (v.debit === undefined || v.debit === null) ? ((v.direction === '贷' || !v.amount) ? '' : v.amount) : v.debit,
+    credit: (v.credit === undefined || v.credit === null) ? ((v.direction === '贷') ? (v.amount ?? '') : '') : v.credit,
+    bizType: v.bizType || '',
+    initiator: v.initiator || '',
+    department: v.department || ''
+  })) : [];
+  /* ctrlPrograms：控制程序表，默认一张含模板断言 */
+  const _DA = CTRL_TPLS.expense.items;
+  const _rcp = WPD[t].ctrlPrograms;
+  let _arr = [];
+  if(Array.isArray(_rcp) && _rcp.length){
+    _arr = _rcp.map(cp => {
+      const rows = Array.isArray(cp.rows) ? cp.rows.map(r => ({assertion: r.assertion || '', measure: r.measure || '', procedure: r.procedure || '', result: r.result || ''})) : _DA.map(a => ({assertion: a, measure: '', procedure: '', result: ''}));
+      /* 标准底稿新增「计税正确」列：已有控制表自动补一列空白 */
+      if(!rows.some(r => r.assertion === '计税正确')) rows.push({assertion:'计税正确', measure:'', procedure:'', result:''});
+      return {name: cp.name || '', policy: cp.policy || '', locked: !!cp.locked, rows};
+    });
+  }
+  if(!_arr.length) _arr = [{name:'', policy:'', locked:false, rows: _DA.map(a => ({assertion: a, measure: '', procedure: '', result: ''}))}];
+  WPD[t].ctrlPrograms = _arr;
+}
+/* 控制程序表模板选择弹窗事件（独立绑定，避免依赖 box 委托） */
+$('#tplModal').addEventListener('click', e => {
+  const card = e.target.closest('[data-tpl]');
+  if(card){
+    const tpl = CTRL_TPLS[card.dataset.tpl];
+    if(!tpl) return;
+    W().ctrlPrograms.push({name:'', policy:'', locked:false, rows: tpl.items.map(a => ({assertion:a, measure:'', procedure:'', result:''}))});
+    saveW(); renderIssues(CUR_WP);
+    $('#tplModal').style.display = 'none';
+    return;
+  }
+  if(e.target.closest('#tplClose') || e.target.id === 'tplModal'){
+    $('#tplModal').style.display = 'none';
+  }
+});
+let CUR_WP = 'rma';
+const W   = () => WPD[CUR_WP];
+const DEF = () => EXP_WPS[CUR_WP];
+const saveW = (t = CUR_WP) => localStorage.setItem(EXP_WPS[t].key, JSON.stringify(WPD[t]));
+
+/* ---- 底稿二级页签 / 抽凭表 / 业务类别柱状图 ---- */
+const WPTAB = {};   // 每份底稿当前页签：voucher | ctrl
+const BAR_COLORS = ['#2c7be5','#0b7a3e','#e2b13c','#c0392b','#7a5fc7','#2aa4a4','#e67e22','#8e6e53'];
+const VOUCHER_FIELDS = ['no','desc','counterAccount','debit','credit','bizType','initiator','department','remark'];
+const blankVoucher = () => ({no:'', desc:'', counterAccount:'', debit:'', credit:'', bizType:'', initiator:'', department:'', remark:''});
+
+function voucherChartData(){
+  const map = new Map();
+  (W().vouchers || []).forEach(v => {
+    const label = (v.bizType || '').trim() || '未分类';
+    const amt = Math.abs(parseFloat(v.debit) || 0) + Math.abs(parseFloat(v.credit) || 0);
+    if(!isFinite(amt) || amt <= 0) return;
+    map.set(label, (map.get(label) || 0) + amt);
+  });
+  return [...map.entries()].sort((a, b) => b[1] - a[1]);
+}
+function chartInnerHtml(){
+  const data = voucherChartData();
+  const total = data.reduce((s, d) => s + d[1], 0);
+  if(!data.length) return '<div class="hbar-empty">暂无发生额数据：在上方表格填写「发生额」与「业务类型」后自动生成</div>';
+  const max = data[0][1];
+  const bars = data.map(([label, val], i) =>
+    '<div class="hbar-row">' +
+      '<div class="hbar-label" title="' + esc(label) + '">' + esc(label) + '</div>' +
+      '<div class="hbar-track"><div class="hbar-fill" style="width:' + (val / max * 100).toFixed(1) + '%;background:' + BAR_COLORS[i % BAR_COLORS.length] + '"></div></div>' +
+      '<div class="hbar-val">' + fmtAmt(val) + '</div>' +
+      '<div class="hbar-pct">' + (val / total * 100).toFixed(1) + '%</div>' +
+    '</div>').join('');
+  return '<div class="hbar-chart">' + bars + '</div>';
+}
+function updateVoucherChart(box){
+  const el = box.querySelector('.voucher-chart-body');
+  if(el) el.innerHTML = chartInnerHtml();
+}
+/* textarea 内容自动换行并按内容自动撑高 */
+function autoGrowVoucherTextareas(root){
+  root.querySelectorAll('table.voucher-table textarea').forEach(t => {
+    t.style.height = 'auto';
+    t.style.height = t.scrollHeight + 'px';
+  });
+}
+function voucherPageHtml(){
+  const vs = W().vouchers || [];
+  const locked = !!W().voucherLocked;
+  const dis = locked ? ' disabled' : '';
+  const rowsHtml = vs.length ? vs.map((v, i) =>
+    '<tr>' +
+      '<td><textarea rows="1" data-vf="no" data-vi="' + i + '" placeholder="如：记-001"' + dis + '>' + esc(v.no || '') + '</textarea></td>' +
+      '<td><textarea rows="1" data-vf="desc" data-vi="' + i + '" placeholder="摘要"' + dis + '>' + esc(v.desc || '') + '</textarea></td>' +
+      '<td><textarea rows="1" data-vf="counterAccount" data-vi="' + i + '" placeholder="对方科目"' + dis + '>' + esc(v.counterAccount || '') + '</textarea></td>' +
+      '<td class="vnum"><input type="number" step="any" data-vf="debit" data-vi="' + i + '" value="' + esc(v.debit) + '" placeholder="0.00"' + dis + '></td>' +
+      '<td class="vnum"><input type="number" step="any" data-vf="credit" data-vi="' + i + '" value="' + esc(v.credit) + '" placeholder="0.00"' + dis + '></td>' +
+      '<td><textarea rows="1" data-vf="bizType" data-vi="' + i + '" placeholder="如：销售返利"' + dis + '>' + esc(v.bizType || '') + '</textarea></td>' +
+      '<td><textarea rows="1" data-vf="initiator" data-vi="' + i + '" placeholder="发起人"' + dis + '>' + esc(v.initiator || '') + '</textarea></td>' +
+      '<td><textarea rows="1" data-vf="department" data-vi="' + i + '" placeholder="发起部门"' + dis + '>' + esc(v.department || '') + '</textarea></td>' +
+      '<td><textarea rows="1" data-vf="remark" data-vi="' + i + '" placeholder="备注"' + dis + '>' + esc(v.remark || '') + '</textarea></td>' +
+      '<td class="vdel"><button data-delvoucher="' + i + '" title="删除此行"' + dis + '>✕</button></td>' +
+    '</tr>').join('') :
+    '<tr><td colspan="10" class="voucher-empty">暂无抽凭记录，点击下方「＋ 添加一行」开始填写</td></tr>';
+  return `
+    <div class="voucher-block">
+      <div class="voucher-title">
+        <h3>凭证时期</h3>
+        <input data-vf="period" value="${esc(W().voucherPeriod || '')}" placeholder="如：2026年1月"${dis}>
+        <button class="voucher-lock${locked ? ' on' : ''}" data-lockvoucher="1" title="${locked ? '点击解锁，解锁后可编辑' : '锁定后不可编辑'}">${locked ? '🔒 已锁定' : '🔓 锁定'}</button>
+      </div>
+      <div class="voucher-table-wrap">
+      <table class="voucher-table">
+        <thead><tr>
+          <th style="width:110px">凭证编号</th>
+          <th style="width:220px">摘要</th>
+          <th style="width:150px">对方科目</th>
+          <th style="width:120px">借方发生额</th>
+          <th style="width:120px">贷方发生额</th>
+          <th style="width:140px">业务类型</th>
+          <th style="width:80px">发起人</th>
+          <th style="width:110px">发起部门</th>
+          <th style="width:200px">备注</th>
+          <th style="width:44px"></th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      </div>
+      <div class="voucher-add"><button class="btn" data-addvoucher="1" style="font-size:12.5px; padding:5px 14px"${dis}>＋ 添加一行</button></div>
+      <div class="chart-card">
+        <h3>业务类别发生额</h3>
+        <div class="voucher-chart-body">${chartInnerHtml()}</div>
+      </div>
+    </div>`;
+}
+
+/* ===== 比率分析：同比 ===== */
+let RATIO_CUR = '', RATIO_PREV = '';
+function plPeriodKeys(){
+  return Object.keys(PERIODS).filter(k => PERIODS[k] && Array.isArray(PERIODS[k].pl) && PERIODS[k].pl.length).sort();
+}
+function ratioYM(key){
+  const m = key.match(/(20\d{2})-(\d{2})/);
+  return m ? {y:+m[1], m:m[2]} : null;
+}
+function sameMonthLastYear(cur, keys){
+  const ym = ratioYM(cur);
+  if(!ym) return '';
+  return keys.find(k => { const o = ratioYM(k); return o && o.y === ym.y - 1 && o.m === ym.m; }) || '';
+}
+function ensureRatioSel(){
+  const keys = plPeriodKeys();
+  if(!keys.length){ RATIO_CUR = RATIO_PREV = ''; return keys; }
+  if(!keys.includes(RATIO_CUR)) RATIO_CUR = (activeKey && keys.includes(activeKey)) ? activeKey : keys[keys.length - 1];
+  if(!keys.includes(RATIO_PREV) || RATIO_PREV === RATIO_CUR){
+    const earlier = keys.filter(k => k < RATIO_CUR);
+    RATIO_PREV = sameMonthLastYear(RATIO_CUR, keys)
+      || earlier[earlier.length - 1]
+      || keys.find(k => k !== RATIO_CUR)
+      || '';
+  }
+  return keys;
+}
+function plByCode(key){
+  const m = new Map();
+  (PERIODS[key]?.pl || []).forEach(r => {
+    if(!r || !r.code || isTotalName(r.en)) return;
+    m.set(String(r.code), r);
+  });
+  return m;
+}
+function ratioCnFor(row){
+  if(!row) return '';
+  return OVR[cnKeyOf(row)] ?? CN_PL_CODE[row.code] ?? CN_PL_NAME[row.en] ?? '';
+}
+function ratioPageHtml(){
+  const scoped = (DEF().accounts || []).map(String);
+  const keys = ensureRatioSel();
+  if(!keys.length){
+    return '<div class="ratio-block"><div class="empty"><div class="big">📈</div>暂无上传的利润表数据，请先在报表页导入报表后再进行同比分析</div></div>';
+  }
+  if(!scoped.length){
+    return '<div class="ratio-block"><div class="empty"><div class="big">📈</div>该底稿尚未配置科目编码，暂无法进行同比分析</div></div>';
+  }
+  const cur = plByCode(RATIO_CUR), prev = plByCode(RATIO_PREV);
+  const rateOf = (ca, pa) => pa === 0 ? (ca === 0 ? null : Infinity) : (ca - pa) / Math.abs(pa) * 100;
+  const rateText = r => r === null || r === undefined ? '—' : r === Infinity ? '新增' : (r > 0 ? '+' : '') + r.toFixed(1) + '%';
+  const rateCls = r => r === null || r === undefined || r === Infinity ? '' : (r > 0 ? 'up' : r < 0 ? 'down' : '');
+  const buildRows = codes => {
+    const out = [];
+    codes.forEach(code => {
+      const a = cur.get(code), b = prev.get(code);
+      const ca = +(a?.amt || 0), pa = +(b?.amt || 0);
+      if(!ca && !pa) return;
+      out.push({code, en:(a?.en || b?.en || ''), cn:ratioCnFor(a || b), ca, pa, diff:ca - pa, rate:rateOf(ca, pa)});
+    });
+    return out.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff));
+  };
+  const rowHtml = r => `
+      <tr>
+        <td class="code">${esc(r.code)}</td>
+        <td><div class="ratio-en">${esc(r.en)}</div>${r.cn ? `<div class="ratio-cn">${esc(r.cn)}</div>` : ''}</td>
+        <td class="num ${r.ca < 0 ? 'neg' : ''}">${fmtAmt(r.ca)}</td>
+        <td class="num ${r.pa < 0 ? 'neg' : ''}">${fmtAmt(r.pa)}</td>
+        <td class="num ${r.diff < 0 ? 'neg' : ''}">${fmtAmt(r.diff)}</td>
+        <td class="num ${rateCls(r.rate)}">${rateText(r.rate)}</td>
+      </tr>`;
+  const emptyRow = msg => `<tr><td colspan="6" style="text-align:center;padding:30px;color:#8a9a91">${msg}</td></tr>`;
+
+  const allCodes = [...new Set([...cur.keys(), ...prev.keys()])];
+  const expRows = buildRows(allCodes.filter(c => scoped.includes(String(c))));
+  const revCodes = allCodes.filter(c => String(c).startsWith('4'));
+  const revLeaves = revCodes.filter(c => !revCodes.some(d => d !== c && d.startsWith(c)));
+  const revRows = buildRows(revLeaves);
+
+  const expCA = expRows.reduce((s, r) => s + r.ca, 0), expPA = expRows.reduce((s, r) => s + r.pa, 0);
+  const revCA = revRows.reduce((s, r) => s + r.ca, 0), revPA = revRows.reduce((s, r) => s + r.pa, 0);
+  const expRate = rateOf(expCA, expPA), revRate = rateOf(revCA, revPA);
+  const gap = (expRate === null || revRate === null || expRate === Infinity || revRate === Infinity) ? null : expRate - revRate;
+  let status = '数据不足', statusCls = 'gray', conclusion = '所选期间缺少费用或收入数据，暂无法判断匹配性。';
+  if(gap !== null){
+    if(Math.abs(gap) <= 10){ status = '基本匹配'; statusCls = 'ok';
+      conclusion = '费用与收入的变动幅度差异在 10 个百分点以内，变动趋势基本一致。'; }
+    else if(gap > 0){ status = '费用增幅高于收入'; statusCls = 'warn';
+      conclusion = `费用增幅比收入增幅高 ${gap.toFixed(1)} 个百分点，建议结合抽凭核查费用增长原因。`; }
+    else { status = '费用增幅低于收入'; statusCls = 'warn';
+      conclusion = `费用增幅比收入增幅低 ${Math.abs(gap).toFixed(1)} 个百分点，建议关注费用归集完整性。`; }
+  } else if(revRate === Infinity || expRate === Infinity){
+    status = '需关注'; statusCls = 'warn';
+    conclusion = '存在对比期无基数的新增或消失金额，建议结合抽凭核查。';
+  }
+
+  const opt = k => `<option value="${esc(k)}"${k === RATIO_CUR ? ' selected' : ''}>${esc(periodLabel(k))}</option>`;
+  const optPrev = k => `<option value="${esc(k)}"${k === RATIO_PREV ? ' selected' : ''}>${esc(periodLabel(k))}</option>`;
+  const expBody = expRows.length ? expRows.map(rowHtml).join('') : emptyRow('本底稿科目在所选期间均无数据');
+  const revBody = revRows.length
+    ? revRows.map(rowHtml).join('') + `<tr class="ratio-total"><td></td><td>收入合计</td>
+        <td class="num ${revCA < 0 ? 'neg' : ''}">${fmtAmt(revCA)}</td>
+        <td class="num ${revPA < 0 ? 'neg' : ''}">${fmtAmt(revPA)}</td>
+        <td class="num ${(revCA - revPA) < 0 ? 'neg' : ''}">${fmtAmt(revCA - revPA)}</td>
+        <td class="num ${rateCls(revRate)}">${rateText(revRate)}</td></tr>`
+    : emptyRow('所选期间无收入类科目数据');
+
+  return `
+    <div class="ratio-block">
+      <div class="ratio-bar">
+        <div class="ratio-field"><span>本期期间</span><select data-ratio="cur">${keys.map(opt).join('')}</select></div>
+        <div class="ratio-field"><span>对比期间</span><select data-ratio="prev">${keys.filter(k => k !== RATIO_CUR).map(optPrev).join('')}</select></div>
+        <span class="chip">按底稿科目编码：${scoped.join('、')}</span>
+        <span class="chip">匹配方式：科目编码</span>
+      </div>
+
+      <div class="match-card ${statusCls}">
+        <div class="match-head"><h3>费用与收入匹配性检验</h3><span class="chip ${statusCls}">${status}</span></div>
+        <div class="match-grid">
+          <div class="match-cell"><div class="lbl">本底稿费用变动率</div><div class="val ${rateCls(expRate)}">${rateText(expRate)}</div></div>
+          <div class="match-cell"><div class="lbl">收入变动率</div><div class="val ${rateCls(revRate)}">${rateText(revRate)}</div></div>
+          <div class="match-cell"><div class="lbl">差异（百分点）</div><div class="val">${gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(1)}</div></div>
+        </div>
+        <p class="match-note">${conclusion}（以 10 个百分点为匹配阈值）</p>
+      </div>
+
+      <div class="ratio-section">
+        <h3>本底稿科目同比分析</h3>
+        <div class="ratio-scroll">
+          <table class="ratio-table">
+            <thead><tr>
+              <th style="width:11%">科目编码</th><th>科目名称</th>
+              <th class="num" style="width:16%">本期金额</th><th class="num" style="width:16%">对比期金额</th>
+              <th class="num" style="width:16%">变动额</th><th class="num" style="width:12%">变动率</th>
+            </tr></thead>
+            <tbody>${expBody}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ratio-section">
+        <h3>收入同比分析</h3>
+        <div class="ratio-scroll">
+          <table class="ratio-table">
+            <thead><tr>
+              <th style="width:11%">科目编码</th><th>科目名称</th>
+              <th class="num" style="width:16%">本期金额</th><th class="num" style="width:16%">对比期金额</th>
+              <th class="num" style="width:16%">变动额</th><th class="num" style="width:12%">变动率</th>
+            </tr></thead>
+            <tbody>${revBody}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ratio-note">同比分析：按科目编码匹配两个期间的利润表数据，变动率 =（本期 − 对比期）/ |对比期|；对比期金额为 0 时显示「新增」。收入合计为利润表中 4 开头收入类科目（剔除上级汇总行）的合计。金额单位：印尼盾。</div>
+    </div>`;
+}
+
+function conclusionHtml(){
+  const c = W().conclusion || {};
+  const listHtml = (kind, arr) => (arr || []).length
+    ? arr.map((it, i) => `<div class="concl-item">
+        <textarea data-conclitem="${kind}" data-i="${i}" rows="2" placeholder="${kind === 'issues' ? '问题描述…' : '建议内容…'}">${esc(it.text || '')}</textarea>
+        <button data-delconcl="${kind}" data-i="${i}" title="删除此条">✕</button>
+      </div>`).join('')
+    : `<div style="font-size:12px;color:#8a9a91;padding:2px 0 6px">暂无条目</div>`;
+  return `
+    <div class="conclusion-block">
+      <div class="conclusion-head">
+        <h3>审计结论</h3>
+        <span class="spacer"></span>
+        <button class="btn ghost" data-exportword="1">⬇ 导出 Word</button>
+      </div>
+      <div class="conclusion-mod">
+        <h4><span class="mod-no">1</span>比率分析情况</h4>
+        <textarea data-concl="ratio" rows="4" placeholder="填写比率分析结论、异常波动及原因判断…">${esc(c.ratio || '')}</textarea>
+      </div>
+      <div class="conclusion-mod">
+        <h4><span class="mod-no">2</span>抽凭检查情况</h4>
+        <textarea data-concl="voucher" rows="4" placeholder="填写抽凭范围、样本量、检查发现及结论…">${esc(c.voucher || '')}</textarea>
+      </div>
+      <div class="conclusion-mod">
+        <h4><span class="mod-no">3</span>控制测试情况</h4>
+        <textarea data-concl="ctrl" rows="4" placeholder="填写控制程序执行情况、控制有效性及缺陷…">${esc(c.ctrl || '')}</textarea>
+      </div>
+      <div class="conclusion-mod">
+        <h4><span class="mod-no">4</span>问题及建议</h4>
+        <div class="concl-sub">
+          <div class="concl-sub-head"><span>问题条目</span><span class="spacer"></span>
+            <button class="btn ghost" data-addconcl="issues">＋ 添加问题</button></div>
+          ${listHtml('issues', c.issues)}
+        </div>
+        <div class="concl-sub">
+          <div class="concl-sub-head"><span>建议条目</span><span class="spacer"></span>
+            <button class="btn ghost" data-addconcl="suggestions">＋ 添加建议</button></div>
+          ${listHtml('suggestions', c.suggestions)}
+        </div>
+      </div>
+      <div class="concl-sign">
+        <label>被审计单位签名</label>
+        <input data-concl="signature" value="${esc(c.signature || '')}" placeholder="请填写被审计单位签名">
+      </div>
+      <div class="concl-note">以上内容自动保存在本底稿；点击「导出 Word」可下载当前结论（.doc）。</div>
+    </div>`;
+}
+
+function exportConclusionWord(){
+  const d = DEF(), c = W().conclusion || {};
+  const wa = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const paras = s => {
+    const t = String(s || '').trim();
+    return t ? t.split(/\r?\n/).filter(x => x.trim()).map(x => `<p>${wa(x)}</p>`).join('') : '<p>&nbsp;</p>';
+  };
+  const itemList = (arr, prefix) => {
+    const list = (arr || []).map(x => String(x.text || '').trim()).filter(Boolean);
+    if(!list.length) return '<p>&nbsp;</p>';
+    return list.map((x, i) => `<p style="text-indent:0;margin-left:2em">${prefix}${i + 1}. ${wa(x)}</p>`).join('');
+  };
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${wa(d.title)}审计结论</title>
+<style>
+@page{size:A4; margin:2.2cm 2cm;}
+body{font-family:"Microsoft YaHei","SimSun",sans-serif; font-size:11pt; line-height:1.9; color:#000;}
+h1{font-size:18pt; text-align:center; margin:0 0 6pt;}
+.meta{text-align:center; text-indent:0; font-size:10.5pt; color:#333; margin:0 0 18pt;}
+h2{font-size:13pt; margin:18pt 0 6pt; padding-bottom:3pt; border-bottom:1px solid #999;}
+p{margin:0 0 5pt; text-indent:2em; text-align:justify;}
+.sign{margin-top:48pt;}
+.sign p{text-indent:0;}
+</style></head><body>
+<h1>${wa(d.title)}审计结论</h1>
+<p class="meta">索引号：${wa(d.idx)}　科目编码：${wa((d.accounts || []).join('、'))}</p>
+<h2>一、比率分析情况</h2>${paras(c.ratio)}
+<h2>二、抽凭检查情况</h2>${paras(c.voucher)}
+<h2>三、控制测试情况</h2>${paras(c.ctrl)}
+<h2>四、问题及建议</h2>
+<p style="text-indent:0"><b>（一）问题</b></p>${itemList(c.issues, '')}
+<p style="text-indent:0"><b>（二）建议</b></p>${itemList(c.suggestions, '')}
+<div class="sign"><p>被审计单位签名：${wa(c.signature || '')}</p></div>
+</body></html>`;
+  const blob = new Blob(['\ufeff' + html], {type:'application/msword'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${d.title}_审计结论_${new Date().toISOString().slice(0,10)}.doc`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+
+function renderIssues(T){
+  CUR_WP = T;
+  const box = $('#' + DEF().box);
+  const d = DEF();
+  W().issues = W().issues || [];
+  if(!Array.isArray(W().vouchers)) W().vouchers = [];
+  if(!W().vouchers.length) W().vouchers.push(blankVoucher());
+  W().voucherPeriod = W().voucherPeriod || '';
+  W().voucherLocked = !!W().voucherLocked;
+  const _DA = CTRL_TPLS.expense.items;
+  if(!Array.isArray(W().ctrlPrograms) || !W().ctrlPrograms.length){
+    W().ctrlPrograms = [{name:'', policy:'', locked:false, rows: _DA.map(a => ({assertion:a, measure:'', procedure:'', result:''}))}];
+  } else {
+    W().ctrlPrograms.forEach(cp => { cp.policy = cp.policy || ''; cp.locked = !!cp.locked; (cp.rows||[]).forEach(r => { if(r.procedure === undefined) r.procedure = ''; if(r.result === undefined) r.result = ''; }); });
+  }
+  const _c = W().conclusion = W().conclusion || {};
+  if(typeof _c.ratio !== 'string') _c.ratio = '';
+  if(typeof _c.voucher !== 'string') _c.voucher = '';
+  if(typeof _c.ctrl !== 'string') _c.ctrl = '';
+  if(typeof _c.signature !== 'string') _c.signature = '';
+  if(!Array.isArray(_c.issues)) _c.issues = [{text:''}];
+  if(!Array.isArray(_c.suggestions)) _c.suggestions = [{text:''}];
+  const tab = WPTAB[T] || 'voucher';
+  /* 重绘前记录表格滚动位置，避免打字/粘贴/增删行后跳回第一列 */
+  const _prevWrap = box.querySelector('.voucher-table-wrap');
+  const _prevScroll = _prevWrap ? {top:_prevWrap.scrollTop, left:_prevWrap.scrollLeft} : null;
+  box.innerHTML = `
+    <div class="wp-head"><h2>${d.title}</h2>
+      <div class="ref">Working Paper — ${d.en} · 索引号：${d.idx} · 比率分析 / 抽凭表 / 控制程序表 / 审计结论 · 数据全局保存，不随报表期间切换</div></div>
+    <div class="wp-tabs">
+      <button class="wp-tab${tab === 'ratio' ? ' active' : ''}" data-wptab="ratio">比率分析</button>
+      <button class="wp-tab${tab === 'voucher' ? ' active' : ''}" data-wptab="voucher">抽凭表</button>
+      <button class="wp-tab${tab === 'ctrl' ? ' active' : ''}" data-wptab="ctrl">控制程序表</button>
+      <button class="wp-tab${tab === 'conclusion' ? ' active' : ''}" data-wptab="conclusion">审计结论</button>
+    </div>
+    ${tab === 'ratio' ? ratioPageHtml() : tab === 'voucher' ? voucherPageHtml() : tab === 'ctrl' ? `
+    <div class="ctrl-block">
+      ${W().ctrlPrograms.length ? W().ctrlPrograms.map((cp, ci) => {
+        const prefix = '控制程序表' + (ci + 1) + '-';
+        const cpLk = !!cp.locked;
+        const cpDis = cpLk ? ' disabled' : '';
+        return '<div class="ctrl-card' + (cpLk ? ' locked' : '') + '" data-ci="' + ci + '">' +
+          '<div class="ctrl-card-head">' +
+            '<span class="ctrl-no">' + prefix + '</span>' +
+            '<input class="ctrl-name" data-f="ctrlName" data-ci="' + ci + '" value="' + esc(cp.name || '') + '" placeholder="填写这张表的名称（如：销售循环 / 采购循环 / 期末关账 …）"' + cpDis + '>' +
+            '<button class="ctrl-lock' + (cpLk ? ' on' : '') + '" data-lockctrl="' + ci + '" title="' + (cpLk ? '点击解锁，解锁后可编辑' : '锁定后本表不可编辑') + '">' + (cpLk ? '🔒 已锁定' : '🔓 锁定') + '</button>' +
+            '<button class="ctrl-del" data-delctrl="' + ci + '"' + (cpLk ? ' disabled' : '') + '>删除</button>' +
+          '</div>' +
+          '<table class="ctrl-table ctrl-table-v"><tbody>' +
+          (() => {
+            const cols = cp.rows || [];
+            const cell = (ri, f, tag, ph) => '<td>' +
+              (tag === 'select'
+                ? '<select data-f="assert" data-ci="' + ci + '" data-ri="' + ri + '"' + cpDis + '>' +
+                  ([''].concat(CTRL_TPLS.expense.items)).map(a =>
+                    '<option value="' + a + '"' + ((cols[ri].assertion || '') === a ? ' selected' : '') + '>' + (a || '— 请选择 —') + '</option>'
+                  ).join('') + '</select>'
+                : '<textarea data-f="' + f + '" data-ci="' + ci + '" data-ri="' + ri + '" placeholder="' + ph + '" rows="3"' + cpDis + '>' + esc(cols[ri][f] || '') + '</textarea>') +
+              '</td>';
+            const rowHtml = (label, f, tag, ph) =>
+              '<tr><th class="ctrl-rowh">' + label + '</th>' +
+              cols.map((_, ri) => cell(ri, f, tag, ph)).join('') +
+              '</tr>';
+            return rowHtml('控制类别', 'assertion', 'select', '') +
+                   rowHtml('控制程序', 'measure', 'textarea', '控制程序…') +
+                   rowHtml('审计程序', 'procedure', 'textarea', '审计程序（如：检查、函证、重新计算…）') +
+                   rowHtml('检查结果', 'result', 'textarea', '检查结果…') +
+                   '<tr class="ctrl-policy-row"><th class="ctrl-rowh">成文制度</th>' +
+                   '<td class="ctrl-policy-cell" colspan="' + Math.max(cols.length, 1) + '">' +
+                     '<textarea data-f="policy" data-ci="' + ci + '" placeholder="是否有成文制度（制度名称 / 文号 / 生效日期…）" rows="2"' + cpDis + '>' + esc(cp.policy || '') + '</textarea>' +
+                   '</td></tr>' +
+                   '<tr><th class="ctrl-rowh-op"></th>' +
+                   cols.map((_, ri) => '<td class="num"><button data-delassert="1" data-ci="' + ci + '" data-ri="' + ri + '" title="删除此列"' + cpDis + '>✕</button></td>').join('') +
+                   '</tr>';
+          })() +
+          '</tbody></table>' +
+          '<div class="ctrl-row-add"><button class="btn" data-addassert="' + ci + '" style="font-size:12.5px; padding:4px 12px"' + cpDis + '>＋ 新增一列</button></div>' +
+        '</div>';
+      }).join('') : '<div class="ctrl-empty">暂无控制程序表</div>'}
+    </div>
+    <div class="ctrl-toolbar">
+      <button class="btn" data-addctrl="1">＋ 增加一张控制程序表</button>
+      <span style="font-size:12px; color:var(--muted)">共 ${W().ctrlPrograms.length} 张</span>
+    </div>` : conclusionHtml()}
+    <div style="height:20px"></div>`;
+  if((WPTAB[T] || 'voucher') === 'voucher') autoGrowVoucherTextareas(box);
+  if(_prevScroll && (WPTAB[T] || 'voucher') === 'voucher'){
+    const nw = box.querySelector('.voucher-table-wrap');
+    if(nw){ nw.scrollTop = _prevScroll.top; nw.scrollLeft = _prevScroll.left; }
+  }
+
+  /* 输入/按钮 → 即时保存；box 是持久容器，每份底稿各绑一次避免监听器叠加 */
+  if(!box._issueBound){
+    box._issueBound = true;
+    box.addEventListener('input', e => {
+      if(e.target.matches && e.target.matches('[data-vf]')){
+        if(e.target.tagName === 'TEXTAREA'){
+          const wrap = box.querySelector('.voucher-table-wrap');
+          const st = wrap ? wrap.scrollTop : 0, sl = wrap ? wrap.scrollLeft : 0;
+          e.target.style.height = 'auto';
+          e.target.style.height = e.target.scrollHeight + 'px';
+          if(wrap){ wrap.scrollTop = st; wrap.scrollLeft = sl; }
+        }
+        const f = e.target.dataset.vf;
+        if(f === 'period'){
+          W().voucherPeriod = e.target.value;
+          saveW();
+          return;
+        }
+        const vi = +e.target.dataset.vi;
+        if(W().vouchers[vi]){
+          W().vouchers[vi][f] = e.target.value;
+          saveW();
+          if(f === 'debit' || f === 'credit' || f === 'bizType') updateVoucherChart(box);
+        }
+        return;
+      }
+      if(e.target.matches && e.target.matches('[data-f="ctrlName"]')){
+        const ci = +e.target.dataset.ci;
+        if(W().ctrlPrograms[ci] && !W().ctrlPrograms[ci].locked){
+          W().ctrlPrograms[ci].name = e.target.value;
+          saveW();
+        }
+        return;
+      }
+      if(e.target.matches && e.target.matches('textarea[data-f="policy"]')){
+        const ci = +e.target.dataset.ci;
+        if(W().ctrlPrograms[ci] && !W().ctrlPrograms[ci].locked){
+          W().ctrlPrograms[ci].policy = e.target.value;
+          saveW();
+        }
+        return;
+      }
+      if(e.target.matches && e.target.matches('input[data-f="assert"], select[data-f="assert"], textarea[data-f="measure"], textarea[data-f="procedure"], textarea[data-f="result"]')){
+        const ci = +e.target.dataset.ci, ri = +e.target.dataset.ri;
+        if(W().ctrlPrograms[ci] && W().ctrlPrograms[ci].rows[ri]){
+          W().ctrlPrograms[ci].rows[ri][e.target.dataset.f] = e.target.value;
+          saveW();
+        }
+        return;
+      }
+      if(e.target.matches && e.target.matches('[data-concl]')){
+        W().conclusion[e.target.dataset.concl] = e.target.value;
+        saveW();
+        return;
+      }
+      if(e.target.matches && e.target.matches('[data-conclitem]')){
+        const kind = e.target.dataset.conclitem, i = +e.target.dataset.i;
+        if(W().conclusion[kind] && W().conclusion[kind][i]){
+          W().conclusion[kind][i].text = e.target.value;
+          saveW();
+        }
+        return;
+      }
+    });
+    /* 支持从 Excel 直接粘贴：从当前单元格向右/向下填充，行数不足自动补行 */
+    box.addEventListener('paste', e => {
+      const cell = e.target.closest && e.target.closest('table.voucher-table [data-vf]');
+      if(!cell || W().voucherLocked) return;
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      if(!text) return;
+      const startCol = VOUCHER_FIELDS.indexOf(cell.dataset.vf);
+      const startRow = +cell.dataset.vi;
+      if(startCol < 0 || !isFinite(startRow)) return;
+      e.preventDefault();
+      const lines = text.replace(/\r/g, '').replace(/\n+$/, '').split('\n');
+      lines.forEach((line, r) => {
+        const cells = line.split('\t');
+        const rowIdx = startRow + r;
+        while(W().vouchers.length <= rowIdx) W().vouchers.push(blankVoucher());
+        const v = W().vouchers[rowIdx];
+        cells.forEach((raw, c) => {
+          const f = VOUCHER_FIELDS[startCol + c];
+          if(!f) return;
+          let val = raw.trim();
+          if(f === 'debit' || f === 'credit') val = val.replace(/[,，¥￥\s]/g, '');
+          v[f] = val;
+        });
+      });
+      saveW();
+      renderIssues(CUR_WP);
+      const tgt = box.querySelector('[data-vf="' + VOUCHER_FIELDS[startCol] + '"][data-vi="' + startRow + '"]');
+      if(tgt) tgt.focus({preventScroll:true});
+    });
+    box.addEventListener('change', e => {
+      if(e.target.matches && e.target.matches('select[data-ratio]')){
+        if(e.target.dataset.ratio === 'cur'){ RATIO_CUR = e.target.value; RATIO_PREV = ''; }
+        else RATIO_PREV = e.target.value;
+        renderIssues(CUR_WP);
+        return;
+      }
+      if(e.target.matches && e.target.matches('select[data-vf]')){
+        const vi = +e.target.dataset.vi;
+        if(W().vouchers[vi]){
+          W().vouchers[vi][e.target.dataset.vf] = e.target.value;
+          saveW();
+        }
+        return;
+      }
+      if(e.target.matches && e.target.matches('select[data-f="assert"]')){
+        const ci = +e.target.dataset.ci, ri = +e.target.dataset.ri;
+        if(W().ctrlPrograms[ci] && W().ctrlPrograms[ci].rows[ri]){
+          W().ctrlPrograms[ci].rows[ri].assertion = e.target.value;
+          saveW();
+        }
+      }
+    });
+    box.addEventListener('click', e => {
+      const tabBtn = e.target.closest('[data-wptab]');
+      if(tabBtn){
+        WPTAB[CUR_WP] = tabBtn.dataset.wptab;
+        renderIssues(CUR_WP);
+        return;
+      }
+      if(e.target.closest('[data-lockvoucher]')){
+        W().voucherLocked = !W().voucherLocked;
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      if(e.target.closest('[data-addvoucher]')){
+        if(W().voucherLocked) return;
+        W().vouchers.push(blankVoucher());
+        saveW(); renderIssues(CUR_WP);
+        const nw = box.querySelector('.voucher-table-wrap');
+        if(nw) nw.scrollTop = nw.scrollHeight;
+        return;
+      }
+      const delV = e.target.closest('[data-delvoucher]');
+      if(delV){
+        if(W().voucherLocked) return;
+        W().vouchers.splice(+delV.dataset.delvoucher, 1);
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      if(e.target.closest('[data-addctrl]')){
+        // 打开模板选择弹窗
+        const tb = $('#tplBody');
+        tb.innerHTML = Object.entries(CTRL_TPLS).map(([k, t]) => `
+          <button class="tpl-card" data-tpl="${k}" style="text-align:left; border:1.5px solid #d6e4f5; border-radius:10px; padding:14px 16px; background:#fff; cursor:pointer; font-family:inherit;">
+            <div style="font-size:15px; font-weight:700; color:#1a3d6e;">${t.label}</div>
+            <div style="font-size:12.5px; color:var(--muted); margin-top:3px;">${t.desc || ''}</div>
+            <div style="font-size:12px; color:var(--muted); margin-top:8px;">${t.items.map(i => '<span style="display:inline-block; background:#eef5fb; color:#1a3d6e; padding:2px 8px; border-radius:4px; margin:2px 4px 2px 0; font-size:11.5px;">' + i + '</span>').join('')}</div>
+          </button>`).join('');
+        $('#tplModal').style.display = 'flex';
+        return;
+      }
+      const lockCtrl = e.target.closest('[data-lockctrl]');
+      if(lockCtrl){
+        const ci = +lockCtrl.dataset.lockctrl;
+        if(!W().ctrlPrograms[ci]) return;
+        W().ctrlPrograms[ci].locked = !W().ctrlPrograms[ci].locked;
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      const addAssert = e.target.closest('[data-addassert]');
+      if(addAssert){
+        const ci = +addAssert.dataset.addassert;
+        if(W().ctrlPrograms[ci].locked) return;
+        W().ctrlPrograms[ci].rows.push({assertion:'', measure:'', procedure:'', result:''});
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      const delCtrl = e.target.closest('[data-delctrl]');
+      if(delCtrl){
+        const ci = +delCtrl.dataset.delctrl;
+        if(W().ctrlPrograms[ci].locked){ alert('该控制程序表已锁定，请先解锁后再删除。'); return; }
+        if(!confirm('确定删除控制程序表 ' + (ci + 1) + ' ？该操作不可恢复。')) return;
+        W().ctrlPrograms.splice(ci, 1);
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      const delAssert = e.target.closest('[data-delassert]');
+      if(delAssert){
+        const ci = +delAssert.dataset.ci, ri = +delAssert.dataset.ri;
+        if(W().ctrlPrograms[ci].locked) return;
+        W().ctrlPrograms[ci].rows.splice(ri, 1);
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      const addConcl = e.target.closest('[data-addconcl]');
+      if(addConcl){
+        const kind = addConcl.dataset.addconcl;
+        if(!Array.isArray(W().conclusion[kind])) W().conclusion[kind] = [];
+        W().conclusion[kind].push({text:''});
+        saveW(); renderIssues(CUR_WP);
+        const items = box.querySelectorAll(`[data-conclitem="${kind}"]`);
+        if(items.length) items[items.length - 1].focus();
+        return;
+      }
+      const delConcl = e.target.closest('[data-delconcl]');
+      if(delConcl){
+        const kind = delConcl.dataset.delconcl, i = +delConcl.dataset.i;
+        if(W().conclusion[kind]) W().conclusion[kind].splice(i, 1);
+        saveW(); renderIssues(CUR_WP);
+        return;
+      }
+      if(e.target.closest('[data-exportword]')){
+        exportConclusionWord();
+        return;
+      }
+    });
+  }
+}
+
+/* =====================================================
+   十、页面切换（侧边栏层级导航）
+===================================================== */
+let currentPage = 'stmt:bs';
+const LS_GRP = 'fsv.navGroups.v1';   // 一级分组折叠状态 {key: true=折叠}
+let NAV_GRP = load(LS_GRP, {});
+const saveGrp = () => localStorage.setItem(LS_GRP, JSON.stringify(NAV_GRP));
+
+function applyGroupState(){
+  document.querySelectorAll('.side-item.group[data-group]').forEach(g => {
+    const key = g.dataset.group;
+    const collapsed = !!NAV_GRP[key];
+    g.classList.toggle('collapsed', collapsed);
+    const box = document.getElementById('grp-' + key);
+    if(box) box.classList.toggle('hidden', collapsed);
+  });
+}
+
+function switchPage(page){
+  currentPage = page;
+  const isStmt = page.startsWith('stmt:');
+  if(isStmt) stmtTab = page.slice(5);
+  $('#stmt').style.display = isStmt ? '' : 'none';
+  for(const t of Object.keys(EXP_WPS))
+    $('#' + EXP_WPS[t].box).classList.toggle('active', page === EXP_WPS[t].box);
+  /* 报表页才显示搜索/工具栏及期间/导入报表栏 */
+  document.querySelector('.toolbar').style.display = isStmt ? '' : 'none';
+  document.querySelector('.manager').style.display = isStmt ? '' : 'none';
+  /* 高亮：子页高亮 + 父级 group 标记 */
+  document.querySelectorAll('.side-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  document.querySelectorAll('.side-item.group').forEach(g => {
+    g.classList.toggle('active', page === g.dataset.group || page.startsWith(g.dataset.group + ':'));
+  });
+  if(isStmt) render();
+  for(const t of Object.keys(EXP_WPS))
+    if(page === EXP_WPS[t].box) renderIssues(t);
+}
+
+/* 侧边栏点击：分组折叠 / 页面切换 */
+document.querySelector('.sidebar').addEventListener('click', e => {
+  const btn = e.target.closest('.side-item');
+  if(!btn) return;
+  /* 一级分组折叠（点箭头区域折叠） */
+  if(btn.classList.contains('group')){
+    const key = btn.dataset.group;
+    if(e.target.closest('.arrow') || !btn.dataset.page){
+      NAV_GRP[key] = !NAV_GRP[key]; saveGrp(); applyGroupState();
+      document.querySelectorAll('.side-item').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
+      return;
+    }
+  }
+  if(btn.classList.contains('disabled')) return;
+  if(!btn.dataset.page) return;
+  switchPage(btn.dataset.page);
+});
+
+
+/* =====================================================
+   十二、应用级功能切换（G Logo）：财务报表 ⇄ 工作日报
+===================================================== */
+let APP_MODE = 'fin';
+function switchApp(mode){
+  APP_MODE = mode;
+  const rep = mode === 'report';
+  document.querySelector('.layout').classList.toggle('report-mode', rep);
+  $('#appFin').classList.toggle('active', !rep);
+  $('#appReport').classList.toggle('active', rep);
+  $('#brandTitle').textContent = rep ? '工作日报工具' : '审计工具';
+  $('#brandSub').textContent = rep
+    ? 'Daily Work Report · 今日工作 / 明日计划 / 问题与待改进 / 备注'
+    : 'Audit Tool · 支持多期间报表导入 / 切换 / 中英科目对照';
+  $('#brandMark').title = rep ? '点击切换到：审计工具' : '点击切换到：工作日报工具';
+  document.title = rep ? '工作日报工具 · Daily Work Report' : '审计工具 · Audit Tool';
+  if(rep) initReportApp();
+}
+$('#brandMark').addEventListener('click', () => switchApp(APP_MODE === 'fin' ? 'report' : 'fin'));
+
+/* =====================================================
+   十三、工作日报模块（合并自 日报/日报工具.html）
+   草稿存 localStorage: daily_report_draft，与原工具数据互通
+===================================================== */
+const DR_KEY = 'daily_report_draft';
+const DR_SECTIONS = ['today', 'tomorrow', 'issues', 'notes'];
+const DR_TITLES = {today:'今日工作', tomorrow:'明日计划', issues:'问题与待改进', notes:'备注'};
+let DR_INITED = false;
+
+const drRoot = () => document.getElementById('appReport');
+const drSec  = name => drRoot().querySelector('.section[data-section="' + name + '"]');
+function drToday(){
+  const t = new Date();
+  return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+}
+
+function drSaveDraft(){
+  const data = {date: document.getElementById('drDate').value};
+  DR_SECTIONS.forEach(s => {
+    data[s] = [];
+    drSec(s).querySelectorAll('.items > .item').forEach(it => {
+      data[s].push({
+        text: it.querySelector('textarea').value,
+        images: [...it.querySelectorAll('.img-preview')].map(im => im.src)
+      });
+    });
+  });
+  localStorage.setItem(DR_KEY, JSON.stringify(data));
+}
+
+function drAddImage(imgList, dataURL){
+  const wrap = document.createElement('div');
+  wrap.className = 'img-wrap';
+  const im = document.createElement('img');
+  im.className = 'img-preview';
+  im.src = dataURL;
+  const rm = document.createElement('button');
+  rm.type = 'button';
+  rm.className = 'remove-img';
+  rm.textContent = '删除图片';
+  rm.addEventListener('click', () => { wrap.remove(); drSaveDraft(); });
+  wrap.appendChild(im); wrap.appendChild(rm);
+  imgList.appendChild(wrap);
+  drSaveDraft();
+}
+
+function drCreateItem(text = '', imageData = null){
+  const item = document.createElement('div');
+  item.className = 'item';
+
+  const num = document.createElement('div');
+  num.className = 'num';
+
+  const content = document.createElement('div');
+  content.className = 'content';
+
+  const imgList = document.createElement('div');
+  imgList.className = 'img-list';
+
+  const ta = document.createElement('textarea');
+  ta.placeholder = '请输入内容…（可直接 Ctrl+V 粘贴截图）';
+  ta.value = text;
+  ta.addEventListener('input', drSaveDraft);
+
+  /* 粘贴剪贴板图片（支持一次粘贴多张） */
+  ta.addEventListener('paste', e => {
+    const cbd = e.clipboardData;
+    if(!cbd) return;
+    const files = [];
+    if(cbd.items){
+      for(let i = 0; i < cbd.items.length; i++){
+        if(cbd.items[i].type.indexOf('image') !== -1){
+          const f = cbd.items[i].getAsFile();
+          if(f) files.push(f);
+        }
+      }
+    }
+    if(!files.length && cbd.files){
+      for(let i = 0; i < cbd.files.length; i++){
+        if(cbd.files[i].type.indexOf('image') !== -1) files.push(cbd.files[i]);
+      }
+    }
+    if(files.length){
+      e.preventDefault();
+      files.forEach(f => {
+        const reader = new FileReader();
+        reader.onload = ev => drAddImage(imgList, ev.target.result);
+        reader.readAsDataURL(f);
+      });
+    }
+  });
+
+  content.appendChild(ta);
+  content.appendChild(imgList);
+
+  /* 图片上传 / 粘贴按钮 */
+  const imgActions = document.createElement('div');
+  imgActions.className = 'img-actions';
+
+  const fileLabel = document.createElement('label');
+  fileLabel.textContent = '📷 添加图片';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.multiple = true;
+  fileLabel.appendChild(fileInput);
+
+  const pasteBtn = document.createElement('button');
+  pasteBtn.type = 'button';
+  pasteBtn.className = 'paste-btn';
+  pasteBtn.textContent = '📋 粘贴截图';
+  pasteBtn.addEventListener('click', async () => {
+    try{
+      if(navigator.clipboard && navigator.clipboard.read){
+        const items = await navigator.clipboard.read();
+        let found = 0;
+        for(const it of items){
+          for(const type of it.types){
+            if(type.indexOf('image') !== -1){
+              const blob = await it.getType(type);
+              const reader = new FileReader();
+              reader.onload = ev => drAddImage(imgList, ev.target.result);
+              reader.readAsDataURL(blob);
+              found++;
+            }
+          }
+        }
+        if(!found){
+          pasteBtn.textContent = '剪贴板中没有图片';
+          setTimeout(() => { pasteBtn.textContent = '📋 粘贴截图'; }, 2000);
+        }
+      }else{
+        pasteBtn.textContent = '浏览器不支持，请用 Ctrl+V';
+        setTimeout(() => { pasteBtn.textContent = '📋 粘贴截图'; }, 2500);
+      }
+    }catch(err){
+      console.error(err);
+      pasteBtn.textContent = '需授权剪贴板访问';
+      setTimeout(() => { pasteBtn.textContent = '📋 粘贴截图'; }, 2500);
+    }
+  });
+
+  imgActions.appendChild(fileLabel);
+  imgActions.appendChild(pasteBtn);
+  content.appendChild(imgActions);
+
+  /* 恢复草稿中的图片（兼容旧格式：单张字符串） */
+  if(imageData){
+    (Array.isArray(imageData) ? imageData : [imageData]).forEach(d => { if(d) drAddImage(imgList, d); });
+  }
+
+  fileInput.addEventListener('change', e => {
+    [...e.target.files].forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => drAddImage(imgList, ev.target.result);
+      reader.readAsDataURL(file);
+    });
+    fileInput.value = '';
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'del-btn';
+  delBtn.textContent = '×';
+  delBtn.title = '删除该条目';
+  delBtn.addEventListener('click', () => {
+    const sec = item.closest('.section');
+    item.remove();
+    drRenumber(sec);
+    drSaveDraft();
+  });
+
+  item.appendChild(num);
+  item.appendChild(content);
+  item.appendChild(delBtn);
+  return item;
+}
+
+function drRenumber(sec){
+  sec.querySelectorAll('.items > .item').forEach((it, idx) => {
+    it.querySelector('.num').textContent = (idx + 1) + '、';
+  });
+}
+
+function drLoadDraft(){
+  const dateEl = document.getElementById('drDate');
+  let data = null;
+  try{
+    const raw = localStorage.getItem(DR_KEY);
+    if(raw) data = JSON.parse(raw);
+  }catch(e){ data = null; }
+  DR_SECTIONS.forEach(s => {
+    const sec = drSec(s);
+    const box = sec.querySelector('.items');
+    box.innerHTML = '';
+    const arr = (data && data[s] && data[s].length) ? data[s] : [{text:'', images:[]}];
+    arr.forEach(it => {
+      const imgs = it.images || (it.image ? [it.image] : null);
+      box.appendChild(drCreateItem(it.text || '', imgs));
+    });
+    drRenumber(sec);
+  });
+  /* 日期默认取当天；草稿里存的是历史日期则自动更新为当天 */
+  const savedDate = (data && data.date) || '';
+  dateEl.value = (savedDate === drToday()) ? savedDate : drToday();
+  drSaveDraft();
+}
+
+/* dataURL → Uint8Array */
+function drDataURLToBytes(dataURL){
+  const arr = dataURL.split(',');
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8 = new Uint8Array(n);
+  while(n--) u8[n] = bstr.charCodeAt(n);
+  return u8;
+}
+
+/* 图片尺寸（按宽度上限等比缩放） */
+function drImageSize(dataURL, maxWidthInches = 5.5){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.height / img.width;
+      let w = maxWidthInches * 96, h = w * ratio;
+      if(h > 7 * 96){ h = 7 * 96; w = h / ratio; }
+      resolve({width:w, height:h});
+    };
+    img.onerror = () => resolve({width:maxWidthInches*96, height:maxWidthInches*96});
+    img.src = dataURL;
+  });
+}
+
+function drFormatDate(s){
+  if(!s) return '';
+  const [y, m, d] = s.split('-').map(Number);
+  return `日期：${y} 年 ${m} 月 ${d} 日`;
+}
+
+async function drExportWord(){
+  const btn = document.getElementById('drExport');
+  const status = document.getElementById('drStatus');
+  if(typeof docx === 'undefined' || typeof saveAs === 'undefined'){
+    status.textContent = '导出库加载失败（需要联网加载 docx / FileSaver），请检查网络后刷新重试。';
+    status.style.color = 'var(--neg)';
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = '正在生成 Word 文件…';
+  status.style.color = 'var(--muted)';
+
+  try{
+    const {Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType} = docx;
+    const dateStr = document.getElementById('drDate').value;
+    const children = [];
+
+    children.push(new Paragraph({children:[new TextRun({text:'工作日报', bold:true, size:30})]}));
+    children.push(new Paragraph({children:[new TextRun({text:drFormatDate(dateStr), bold:true, size:30})]}));
+    children.push(new Paragraph({children:[]}));
+
+    for(const s of DR_SECTIONS){
+      children.push(new Paragraph({children:[new TextRun({text:DR_TITLES[s], bold:true, size:30})]}));
+      const items = drSec(s).querySelectorAll('.items > .item');
+      let idx = 0;
+      for(const it of items){
+        const text = it.querySelector('textarea').value.trim();
+        const imgEls = it.querySelectorAll('.img-preview');
+        idx++;
+        const prefix = idx + '、';
+        if(imgEls.length){
+          const caption = prefix + text + (text ? '：' : '');
+          children.push(new Paragraph({alignment:AlignmentType.LEFT, children:[new TextRun({text:caption, size:24})]}));
+          for(const imgEl of imgEls){
+            const bytes = drDataURLToBytes(imgEl.src);
+            const size = await drImageSize(imgEl.src);
+            children.push(new Paragraph({children:[new ImageRun({data:bytes, transformation:{width:size.width, height:size.height}})]}));
+          }
+        }else{
+          children.push(new Paragraph({alignment:AlignmentType.LEFT, children:[new TextRun({text:prefix + text, size:24})]}));
+        }
+      }
+    }
+
+    const doc = new Document({sections:[{properties:{}, children}]});
+    const blob = await Packer.toBlob(doc);
+    const [y, m, d] = (dateStr || drToday()).split('-');
+    const filename = `工作日报-${m}${d}.docx`;
+    saveAs(blob, filename);
+
+    status.textContent = '✓ 导出成功：' + filename;
+    status.style.color = 'var(--green)';
+  }catch(err){
+    console.error(err);
+    status.textContent = '导出失败：' + err.message;
+    status.style.color = 'var(--neg)';
+  }finally{
+    btn.disabled = false;
+    setTimeout(() => { status.textContent = ''; }, 4000);
+  }
+}
+
+function initReportApp(){
+  if(DR_INITED) return;
+  DR_INITED = true;
+  drRoot().querySelectorAll('.section').forEach(sec => {
+    sec.querySelector('.add-btn').addEventListener('click', () => {
+      const item = drCreateItem();
+      sec.querySelector('.items').appendChild(item);
+      drRenumber(sec);
+      item.querySelector('textarea').focus();
+      drSaveDraft();
+    });
+  });
+  document.getElementById('drDate').addEventListener('change', drSaveDraft);
+  document.getElementById('drExport').addEventListener('click', drExportWord);
+  document.getElementById('drClear').addEventListener('click', () => {
+    if(!confirm('确定要清空所有内容吗？')) return;
+    localStorage.removeItem(DR_KEY);
+    DR_SECTIONS.forEach(s => {
+      const sec = drSec(s);
+      const box = sec.querySelector('.items');
+      box.innerHTML = '';
+      box.appendChild(drCreateItem());
+      drRenumber(sec);
+    });
+    drSaveDraft();
+  });
+  drLoadDraft();
+}
+
+applyGroupState();
+render();
+</script>
+</body>
+</html>
